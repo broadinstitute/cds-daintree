@@ -17,8 +17,11 @@ from utils import (
     process_biomarker_matrix,
     process_column_name,
 )
+from taiga_utils import update_taiga
+
 
 ensemble_filename = "ensemble.csv"
+feature_metadata_filename = "feature_metadata.csv"
 
 @click.group()
 def cli():
@@ -213,9 +216,9 @@ def _collect_and_fit(
     sparkles_path,
     sparkles_config,
     save_dir=None,
-    out_bucket=None,
     test=False,
     skipfit=False,
+    upload_to_taiga=None,
     restrict_targets=False,
     restrict_to=None,
 ):
@@ -300,7 +303,14 @@ def _collect_and_fit(
 
     # generate feature info file
     feature_info.to_csv(save_pref / "feature_info.csv")
-    feature_info_df.to_csv(save_pref / "feature_metadata.csv")
+    feature_info_df.to_csv(save_pref / feature_metadata_filename)
+    if upload_to_taiga:
+        update_taiga(
+            feature_info_df,
+            "Feature Metadata",
+            upload_to_taiga,
+            "FeatureMetadata",
+        )
 
     print('running "prepare_y"...')
     subprocess.check_call(
@@ -355,7 +365,13 @@ def _collect_and_fit(
             save_pref, targets=str(save_pref / "dep.ftr"), top_n=10
         )
         df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
-
+        if upload_to_taiga:
+            update_taiga(
+                df_ensemble,
+                "Y Matrix",
+                upload_to_taiga,
+                "PredictabilityYMatrix",
+            )
     else:
         print("skipping fitting and ending run")
 
@@ -393,6 +409,12 @@ def _collect_and_fit(
     help="Do not execute the fitting, only prepare files. Used for testing",
 )
 @click.option(
+    "--upload-to-taiga",
+    default=None,
+    type=str,
+    help="Upload the Y matrix and the feature metadata to Taiga",
+)
+@click.option(
     "--restrict-targets",
     default=False,
     type=bool,
@@ -411,9 +433,9 @@ def collect_and_fit_generate_config(
     sparkles_path,
     sparkles_config,
     save_dir=None,
-    out_bucket=None,
     test=False,
     skipfit=False,
+    upload_to_taiga=None,
     restrict_targets=False,
     restrict_to=None,
 ):
@@ -437,9 +459,9 @@ def collect_and_fit_generate_config(
         sparkles_path,
         sparkles_config,
         save_dir,
-        out_bucket,
         test,
         skipfit,
+        upload_to_taiga,
         restrict_targets,
         restrict_to,
     )
@@ -470,6 +492,11 @@ def collect_and_fit_generate_config(
     is_flag=True,
     help="Do not execute the fitting, only prepare files. Used for testing",
 )
+@click.option(
+    "--upload-to-taiga",
+    is_flag=True,
+    help="Upload the Y matrix and the feature metadata to Taiga",
+)
 def collect_and_fit(
     input_files,
     ensemble_config,
@@ -477,6 +504,7 @@ def collect_and_fit(
     sparkles_config,
     test=False,
     skipfit=False,
+    upload_to_taiga=None,
 ):
 
     _collect_and_fit(
@@ -485,9 +513,9 @@ def collect_and_fit(
         sparkles_path,
         sparkles_config,
         save_dir=None,
-        out_bucket=None,
         test=test,
         skipfit=skipfit,
+        upload_to_taiga=upload_to_taiga,
     )
 
 
