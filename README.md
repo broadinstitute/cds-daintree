@@ -18,13 +18,12 @@ daintree-fit-models \
    --config <MODEL_CONFIG> 
    --out <OUTPUT_DIR>
 ```
-
+ 
 Requrired parameters:
 
 * `--image`: The docker image built with this version of daintree which will be used to launch the sparkles job as well as run on the remote worker hosts.
 * `--out`: The directory to write the output to.
 * `--config`: A JSON file describing how to train the models. See `Model config file` below for a description of the format of this file. You can specify this parameter multiple times for fitting multiple types of models in a single submission.
-* `--upload-to-taiga`: The taiga id where the output matrix and feature metadata to be uploaded. 
 
 
 Optional parameters:
