@@ -1,0 +1,7 @@
+CellContext:
+  Features:
+  - RNASeq
+  Jobs: 10
+  Relation: All
+  Required:
+  - RNASeq
