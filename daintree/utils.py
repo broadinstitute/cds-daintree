@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import re
 
-FEATURE_LIMIT = 5
+from config import TEST_GENE_LIMIT
+
 
 def clean_dataframe(df, index_col):
     df.sort_index(inplace=True, axis=1)
@@ -32,7 +33,7 @@ def process_biomarker_matrix(df, index_col=0, test=False):
     df = clean_dataframe(df, index_col)
     print("Start Processing Biomarker Matrix")
     if test:
-        df = df.iloc[:, :FEATURE_LIMIT]
+        df = df.iloc[:, :TEST_GENE_LIMIT]
     print(df.head())
     print("End Processing Biomarker Matrix")
     df.to_csv("features.csv", index=False)
@@ -52,7 +53,7 @@ def process_dep_matrix(df, test=False, restrict_targets=False, restrict_to=None)
             restrict_deps = restrict_to.split(";")
             df = df[["Row.name"] + restrict_deps]
         else:
-            df = df.iloc[:, :FEATURE_LIMIT+1]
+            df = df.iloc[:, :TEST_GENE_LIMIT+1]
     elif restrict_targets:
         restrict_deps = restrict_to.split(";")
         df = df[["Row.name"] + restrict_deps]

@@ -385,6 +385,7 @@ def _collect_and_fit(
 @click.option(
     "--model-name",
     required=True,
+    default="Model",
     help="Name of the model to be generated",
 )
 @click.option("--sparkles-path", required=True, help="path to the sparkles command")
