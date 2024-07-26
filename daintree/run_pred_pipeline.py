@@ -1,142 +1,29 @@
 import json
 import pandas as pd
 from taigapy import create_taiga_client_v3
-import numpy as np
 import datetime as dt
 import yaml
 import subprocess
 import os
 from pathlib import Path
-import copy
 from string import Template
-import datetime
-from cds_ensemble.__main__ import prepare_x, prepare_y, fit_model
 import click
-import pytest
 
-tc = create_taiga_client_v3()
+from utils import (
+    generate_config,
+    generate_feature_info,
+    partiton_inputs,
+    process_dep_matrix,
+    process_biomarker_matrix,
+    process_column_name,
+)
 
+ensemble_filename = "ensemble.csv"
 
 @click.group()
 def cli():
     pass
 
-
-def int_or_str(s: str):
-    if s.isdecimal():
-        return int(s)
-    return s
-
-
-def clean_dataframe(df, index_col):
-    df.sort_index(inplace=True, axis=1)
-
-    if index_col is None:
-        df.sort_values(df.columns.tolist(), inplace=True)
-    else:
-        df.sort_index(inplace=True)
-
-    return df
-
-
-def process_biomarker_matrix(df, index_col=0, test=False):
-    # consolidates the following conseq rules:
-    ### create_biomarker_matrix_csv, make_pred_biomarker_matrix, thats it?
-    df = df.T
-    df = clean_dataframe(df, index_col)
-    if test:
-        df = df.iloc[:, :5]
-    return df
-
-
-def process_dep_matrix(df, test=False, restrict_targets=False, restrict_to=None):
-    # drops rows and columns with all nulls, creates y matrix with cds-ensemble
-    df = df.dropna(how="all", axis=0)
-    df = df.dropna(how="all", axis=1)
-    df.index.name = "Row.name"
-    df = df.reset_index()
-    if test:
-        if restrict_targets:
-            print("target restriction:", restrict_to)
-            restrict_deps = restrict_to.split(";")
-            df = df[["Row.name"] + restrict_deps]
-        else:
-            df = df.iloc[:, :6]
-    elif restrict_targets:
-        restrict_deps = restrict_to.split(";")
-        df = df[["Row.name"] + restrict_deps]
-
-    return df
-
-
-def partiton_inputs(dep_matrix, ensemble_config, save_pref, out_name="partitions.csv"):
-    num_genes = dep_matrix.shape[1]
-    start_indexes = []
-    end_indexes = []
-    models = []
-
-    for model_name, model_config in ensemble_config.items():
-
-        num_jobs = int(model_config["Jobs"])
-        start_index = np.array(range(0, num_genes, num_jobs))
-        end_index = start_index + num_jobs
-        end_index[-1] = num_genes
-        start_indexes.append(start_index)
-        end_indexes.append(end_index)
-        models.append([model_name] * len(start_index))
-
-    param_df = pd.DataFrame(
-        {
-            "start": np.concatenate(start_indexes),
-            "end": np.concatenate(end_indexes),
-            "model": np.concatenate(models),
-        }
-    )
-    param_df.to_csv(save_pref / out_name, index=False)
-
-
-def generate_config(ipt_dicts, relation="All", name="Model"):
-    # input json format:
-    # {'name':name, 'taiga_filename':taiga_filename, 'categorical': False, 'required': False, 'match_with': False, 'exempt': False, 'dep_or_feature':'feature'}
-    features = [
-        ipt_dicts[d]["name"]
-        for d in ipt_dicts
-        if (ipt_dicts[d]["table_type"] == "feature")
-    ]
-    required = [
-        ipt_dicts[d]["name"]
-        for d in ipt_dicts
-        if ((ipt_dicts[d]["table_type"] == "feature") and ipt_dicts[d]["required"])
-    ]
-    exempt = [
-        ipt_dicts[d]["name"]
-        for d in ipt_dicts
-        if ((ipt_dicts[d]["table_type"] == "feature") and ipt_dicts[d]["exempt"])
-    ]
-    model_config = dict()
-    model_config["Features"] = features
-    model_config["Required"] = required
-    model_config["Relation"] = relation
-    if relation == "MatchRelated":
-        model_config["Related"] = [
-            ipt_dicts[d]["name"]
-            for d in ipt_dicts
-            if ((ipt_dicts[d]["table_type"] == "relation"))
-        ][0]
-    model_config["Jobs"] = 10
-    if exempt:
-        model_config["Exempt"] = exempt
-
-    return {name: model_config}
-
-
-def generate_feature_info(ipt_dicts, save_pref):
-    dsets = [d[1]["name"] for d in ipt_dicts.items() if (d[1]["table_type"] != "dep")]
-    fnames = [str(save_pref / (dset + ".csv")) for dset in dsets]
-
-    df = pd.DataFrame({"dataset": dsets, "filename": fnames,})
-
-    return df
 
 
 def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, save_pref):
@@ -147,8 +34,9 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.extend(["--config", sparkles_config])
     cmd.append("sub")
     cmd.extend(
-        ["-i", "us.gcr.io/broad-achilles/depmap-pipeline-tda-integrated-hermitshell:v0"]
+        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v1"]
     )
+    cmd.extend(["-u", "/daintree/daintree/main.py"])
     cmd.extend(["-u", str(save_pref / "dep.ftr") + ":target.ftr"])
     cmd.extend(["-u", str(save_pref / config_fname) + ":model-config.yaml"])
     cmd.extend(["-u", str(save_pref / "X.ftr") + ":X.ftr"])
@@ -163,6 +51,7 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.append("--skipifexists")
     cmd.extend(["--nodes", "100"])
     cmd.extend(["-n", "ensemble_" + dt_hash])
+    # cmd.extend(["/install/depmap-py/bin/python3.9", "/daintree/daintree/main.py", "fit-model"])
     cmd.extend(["/install/depmap-py/bin/cds-ensemble", "fit-model"])
     cmd.extend(["--x", "X.ftr"])
     cmd.extend(["--y", "target.ftr"])
@@ -174,8 +63,10 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.extend(["--model-valid-samples", "X_valid_samples.ftr"])
     cmd.extend(["--target-range", "{start}", "{end}"])
     cmd.extend(["--model", "{model}"])
+    print(f"Running sparkles with command: {cmd}")
     print(cmd)
     subprocess.check_call(cmd)
+    print("sparkles run complete")
     return dt_hash
 
 
@@ -186,17 +77,10 @@ $sparkles_path --config $sparkles_config reset ensemble_$HASH
 $sparkles_path --config $sparkles_config watch ensemble_$HASH --loglive
 mkdir -p $save_pref/data
 default_url_prefix=$(awk -F "=" '/default_url_prefix/ {print $2}' "$sparkles_config")
+/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file /root/.sparkles-cache/service-keys/broad-achilles.json
 /google-cloud-sdk/bin/gcloud storage ls ${default_url_prefix}/ensemble_$HASH/*/*.csv > $save_pref/completed_jobs.txt
 /install/depmap-py/bin/python3.9 validate_jobs_complete.py $save_pref/completed_jobs.txt $save_pref/partitions.csv features.csv predictions.csv
 /google-cloud-sdk/bin/gcloud storage cp ${default_url_prefix}/ensemble_$HASH/*/*.csv $save_pref/data
-"""
-)
-
-upload_str = Template(
-    """set -ex
-/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file /root/.sparkles-cache/service-keys/broad-achilles.json
-/google-cloud-sdk/bin/gcloud storage cp -R $save_pref/* gs://cds-ensemble-pipeline/$gcp_bucket
-/google-cloud-sdk/bin/gcloud storage cp /depmap/pipeline/predictability/scripts/model-map.json gs://cds-ensemble-pipeline/$gcp_bucket
 """
 )
 
@@ -335,6 +219,7 @@ def _collect_and_fit(
     restrict_targets=False,
     restrict_to=None,
 ):
+    tc = create_taiga_client_v3()
     save_pref = Path(os.getcwd())
     if save_dir is not None:
         save_pref = Path(save_dir)
@@ -368,20 +253,40 @@ def _collect_and_fit(
     related_dset = None
     if out_rel:
         related_dset = list(set(relations).difference(set(["All", "MatchTarget"])))[0]
-
-    # generate the feature files for feature_info.csv to point to
-    print("saving processed data locally and generating feature_info.csv...")
+    print("generating feature info...")
+    print(ipt_dict)
+    print("#######################")
+    feature_info_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_id"])
     if test:
         print("and truncating datasets for testing...")
     for _, d in ipt_dict.items():
         if d["table_type"] not in ["feature", "relation"]:
             continue
         _df = tc.get(d["taiga_filename"])
+        print(f"dataset: {d['name']}")
+        print(_df.head())
+
         if (related_dset is None) or (
             (related_dset is not None) and d["name"] != related_dset
         ):
             _df = process_biomarker_matrix(_df, 0, test)
+        print(f"processed dataset: {d['name']}")
+        print(_df.head())
+
+        for col in _df.columns:
+            feature_name, feature_label, given_id = process_column_name(col, d["name"])
+            feature_info_df = feature_info_df.append({
+                "model": d["name"],
+                "feature_name": feature_name,
+                "feature_label": feature_label,
+                "given_id": given_id,
+                "taiga_id": d["taiga_filename"],
+                "dim_id": d["dim_type"]
+            }, ignore_index=True)
         _df.to_csv(feature_info.set_index("dataset").loc[d["name"]].filename)
+    
+    print("feature info generated")
+    print("#######################")
 
     print("processing dependency data...")
     # load, process, and save dependency matrix
@@ -395,11 +300,12 @@ def _collect_and_fit(
 
     # generate feature info file
     feature_info.to_csv(save_pref / "feature_info.csv")
+    feature_info_df.to_csv(save_pref / "feature_metadata.csv")
 
     print('running "prepare_y"...')
     subprocess.check_call(
         [
-            "/install/depmap-py/bin/cds-ensemble",
+            "/install/depmap-py/bin/cds-ensemble", 
             "prepare-y",
             "--input",
             str(save_pref / "dep.ftr"),
@@ -448,19 +354,10 @@ def _collect_and_fit(
         df_ensemble, df_predictions = gather_ensemble_tasks(
             save_pref, targets=str(save_pref / "dep.ftr"), top_n=10
         )
-        df_ensemble.to_csv(save_pref / "ensemble.csv", index=False)
-        df_predictions.to_csv(save_pref / "predictions.csv")
+        df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
 
     else:
         print("skipping fitting and ending run")
-
-    print("uploading files to GCP")
-    upload_dict = {
-        "ipt_files": input_files,
-        "gcp_bucket": out_bucket,
-        "save_pref": str(save_pref),
-    }
-    save_and_run_bash(upload_str, upload_dict)
 
 
 @cli.command()
@@ -468,6 +365,11 @@ def _collect_and_fit(
     "--input-files",
     required=True,
     help="JSON file containing the set of files for prediction",
+)
+@click.option(
+    "--model-name",
+    required=True,
+    help="Name of the model to be generated",
 )
 @click.option("--sparkles-path", required=True, help="path to the sparkles command")
 @click.option(
@@ -477,12 +379,6 @@ def _collect_and_fit(
     "--save-dir",
     required=False,
     help="""path to where the data should be stored if not the same directory as the script. path is relative to current working directory""",
-)
-@click.option(
-    "--out-bucket",
-    required=False,
-    type=str,
-    help="""location in the "cds-ensemble-pipeline" bucket where the data should be uploaded to""",
 )
 @click.option(
     "--test",
@@ -511,6 +407,7 @@ def _collect_and_fit(
 )
 def collect_and_fit_generate_config(
     input_files,
+    model_name,
     sparkles_path,
     sparkles_config,
     save_dir=None,
@@ -527,7 +424,7 @@ def collect_and_fit_generate_config(
     if save_dir is not None:
         save_pref /= save_dir
         save_pref.mkdir(parents=True, exist_ok=True)
-    config = generate_config(ipt_dict, relation="All")
+    config = generate_config(ipt_dict, name=model_name, relation="All", )
     dt_hash = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
     model_config_name = "model-config" + "_temp_" + ".yaml"
 

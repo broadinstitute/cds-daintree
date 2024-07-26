@@ -1,0 +1,16 @@
+{
+    "RNASeq": {"name":"RNASeq",
+                "taiga_filename":"internal-23q4-ac2b.21/OmicsExpressionProteinCodingGenesTPMLogp1",
+                "table_type":"feature",
+                "required":true,
+                "exempt":false,
+                "dim_type": "rnaseq"
+            },
+    
+
+    "RNAi": {"name":"RNAi",
+            "taiga_filename":"demeter2-combined-dc9c.19/gene_means_proc",
+            "table_type":"dep",
+            "relation":"All"}
+    }
+    

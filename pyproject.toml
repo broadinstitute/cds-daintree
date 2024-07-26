@@ -12,6 +12,7 @@ python = "^3.12"
 pandas = "1.5.3"
 click = "^8.1.7"
 numpy = "^1.25.1"
+scikit-learn = "1.5.1"
 taigapy = {version = "3.8.3", source = "gcp-artifact-registry"}
 
 
