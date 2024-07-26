@@ -7,7 +7,62 @@
                 "dim_type": "rnaseq"
             },
     
-
+    "GeneCN": {"name":"GeneCN",
+                "taiga_filename":"predictability-76d5.89/PortalOmicsCNGeneLog2",
+                "table_type":"feature",
+                "required":false,
+                "exempt":false,
+                "dim_type": "gene_cn"
+            },
+    
+    "MutDam": {"name":"MutDam",
+                "taiga_filename":"internal-23q4-ac2b.50/OmicsSomaticMutationsMatrixDamaging",
+                "table_type":"feature",
+                "required":false,
+                "exempt":false,
+                "dim_type": "mutation_damaging"
+            },
+    
+    "MutHot": {"name":"MutHot",
+                "taiga_filename":"internal-23q4-ac2b.49/OmicsSomaticMutationsMatrixHotspot",
+                "table_type":"feature",
+                "required":false,
+                "exempt":false,
+                "dim_type": "mutation_hotspot"
+            },
+    
+    "Fusion": {"name":"Fusion",
+                "taiga_filename":"predictability-76d5.92/PredictabilityFusionTransformed",
+                "table_type":"feature",
+                "required":false,
+                "exempt":false,
+                "dim_type": "fusion"
+            },
+    
+    "Lin": {"name":"Lin",
+                "taiga_filename":"predictability-76d5.91/PredictabilityLineageTransformed",
+                "table_type":"feature",
+                "required":true,
+                "exempt":false,
+                "dim_type": "lineage"
+            },
+    
+    "DriverEvents": {"name":"DriverEvents",
+                "taiga_filename":"predictability-76d5.93/DriverEvents",
+                "table_type":"feature",
+                "required":true,
+                "exempt":false,
+                "dim_type": "driver_events"
+            },
+    
+    "GeneticDerangement": {"name":"GeneticDerangement",
+                "taiga_filename":"predictability-76d5.94/PredictabilityGenticDerangementTransformed",
+                "table_type":"feature",
+                "required":true,
+                "exempt":false,
+                "dim_type": "genetic_derangement"
+            },
+    
     "RNAi": {"name":"RNAi",
             "taiga_filename":"demeter2-combined-dc9c.19/gene_means_proc",
             "table_type":"dep",
