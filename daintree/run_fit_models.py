@@ -37,9 +37,9 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.extend(["--config", sparkles_config])
     cmd.append("sub")
     cmd.extend(
-        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v1"]
+        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v2"]
     )
-    cmd.extend(["-u", "/daintree/daintree/main.py"])
+    cmd.extend(["-u", "/daintree/daintree_package/daintree_package/main.py"])
     cmd.extend(["-u", str(save_pref / "dep.ftr") + ":target.ftr"])
     cmd.extend(["-u", str(save_pref / config_fname) + ":model-config.yaml"])
     cmd.extend(["-u", str(save_pref / "X.ftr") + ":X.ftr"])
@@ -54,7 +54,6 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.append("--skipifexists")
     cmd.extend(["--nodes", "100"])
     cmd.extend(["-n", "ensemble_" + dt_hash])
-    # cmd.extend(["/install/depmap-py/bin/python3.9", "/daintree/daintree/main.py", "fit-model"])
     cmd.extend(["/install/depmap-py/bin/daintree", "fit-model"])
     cmd.extend(["--x", "X.ftr"])
     cmd.extend(["--y", "target.ftr"])
@@ -278,14 +277,15 @@ def _collect_and_fit(
 
         for col in _df.columns:
             feature_name, feature_label, given_id = process_column_name(col, d["name"])
-            feature_info_df = feature_info_df.append({
-                "model": d["name"],
-                "feature_name": feature_name,
-                "feature_label": feature_label,
-                "given_id": given_id,
-                "taiga_id": d["taiga_filename"],
-                "dim_type": d["dim_type"]
-            }, ignore_index=True)
+            new_row = pd.DataFrame({
+                "model": [d["name"]],
+                "feature_name": [feature_name],
+                "feature_label": [feature_label],
+                "given_id": [given_id],
+                "taiga_id": [d["taiga_filename"]],
+                "dim_type": [d["dim_type"]]
+            })
+            feature_info_df = pd.concat([feature_info_df, new_row], ignore_index=True)
         _df.to_csv(feature_info.set_index("dataset").loc[d["name"]].filename)
     
     print("feature info generated")
