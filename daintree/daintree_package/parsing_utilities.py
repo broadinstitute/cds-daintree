@@ -7,8 +7,8 @@ import pandas as pd
 import pyarrow
 import yaml
 
-from data_models import ModelConfig, FeatureInfo
-from exceptions import MalformedGeneLabelException
+from .data_models import ModelConfig, FeatureInfo
+from .exceptions import MalformedGeneLabelException
 
 GENE_LABEL_FORMAT = r"^[a-zA-Z\d\-]+ \(\d+\)$"
 GENE_LABEL_FORMAT_GROUPS = r"^([a-zA-Z\d\-]+) \((\d+)\)$"

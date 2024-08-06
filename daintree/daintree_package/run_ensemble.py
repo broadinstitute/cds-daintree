@@ -14,9 +14,9 @@ from sklearn.metrics import r2_score, roc_auc_score
 from sklearn.model_selection import KFold, StratifiedKFold
 from typing_extensions import TypedDict
 
-from data_models import ModelConfig
-from exceptions import MalformedGeneLabelException
-from parsing_utilities import split_gene_label_str
+from .data_models import ModelConfig
+from .exceptions import MalformedGeneLabelException
+from .parsing_utilities import split_gene_label_str
 
 
 def filter_run_ensemble_inputs(
