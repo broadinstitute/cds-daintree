@@ -13,4 +13,3 @@ RUN /install/depmap-py/bin/pip install git+https://github.com/broadinstitute/cds
 RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-458.0.1-linux-x86_64.tar.gz
 RUN tar -xf google-cloud-cli-458.0.1-linux-x86_64.tar.gz
 RUN ./google-cloud-sdk/install.sh -q
-    
