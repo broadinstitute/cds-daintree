@@ -17,7 +17,7 @@ scikit-learn = ">=0,<1"
 typing-extensions = ">=3,<4"
 
 [tool.poetry.scripts]
-daintree = "daintree_package.__main__:main"
+daintree = "daintree_package.main:main"
 
 
 [[tool.poetry.source]]

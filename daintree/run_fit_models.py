@@ -55,7 +55,7 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.extend(["--nodes", "100"])
     cmd.extend(["-n", "ensemble_" + dt_hash])
     # cmd.extend(["/install/depmap-py/bin/python3.9", "/daintree/daintree/main.py", "fit-model"])
-    cmd.extend(["/install/depmap-py/bin/cds-ensemble", "fit-model"])
+    cmd.extend(["/install/depmap-py/bin/daintree", "fit-model"])
     cmd.extend(["--x", "X.ftr"])
     cmd.extend(["--y", "target.ftr"])
     cmd.extend(["--model-config", "model-config.yaml"])
@@ -315,7 +315,7 @@ def _collect_and_fit(
     print('running "prepare_y"...')
     subprocess.check_call(
         [
-            "/install/depmap-py/bin/cds-ensemble", 
+            "/install/depmap-py/bin/daintree", 
             "prepare-y",
             "--input",
             str(save_pref / "dep.ftr"),
@@ -327,7 +327,7 @@ def _collect_and_fit(
     # pytest.set_trace()
     print('running "prepare_x"...')
     prep_x_cmd = [
-        "/install/depmap-py/bin/cds-ensemble",
+        "/install/depmap-py/bin/daintree",
         "prepare-x",
         "--model-config",
         str(ensemble_config),
