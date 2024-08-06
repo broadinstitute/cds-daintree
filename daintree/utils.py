@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import re
 
-from config import TEST_GENE_LIMIT
+from config import TEST_GENE_LIMIT, filter_columns
 
 
 def clean_dataframe(df, index_col):
@@ -33,7 +33,15 @@ def process_biomarker_matrix(df, index_col=0, test=False):
     df = clean_dataframe(df, index_col)
     print("Start Processing Biomarker Matrix")
     if test:
-        df = df.iloc[:, :TEST_GENE_LIMIT]
+        df = df.iloc[:, :]
+        # # Create a regex pattern with word boundaries
+        # pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns) + r')\b'
+
+        # # Create a boolean mask for columns that contain any of the filter_columns as whole words
+        # mask = df.columns.str.contains(pattern, regex=True)
+
+        # # Use the mask to select the desired columns
+        # df = df.loc[:, mask]
     print(df.head())
     print("End Processing Biomarker Matrix")
     df.to_csv("features.csv", index=False)
@@ -42,7 +50,7 @@ def process_biomarker_matrix(df, index_col=0, test=False):
 
 def process_dep_matrix(df, test=False, restrict_targets=False, restrict_to=None):
     # drops rows and columns with all nulls, creates y matrix with cds-ensemble
-    df = df.T
+    # df = df.T
     df = df.dropna(how="all", axis=0)
     df = df.dropna(how="all", axis=1)
     df.index.name = "Row.name"
@@ -53,7 +61,16 @@ def process_dep_matrix(df, test=False, restrict_targets=False, restrict_to=None)
             restrict_deps = restrict_to.split(";")
             df = df[["Row.name"] + restrict_deps]
         else:
-            df = df.iloc[:, :TEST_GENE_LIMIT+1]
+            # df = df.iloc[:, :TEST_GENE_LIMIT+1]
+            # Create a regex pattern with word boundaries
+            pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns) + r')\b'
+
+            # Create a boolean mask for columns that contain any of the filter_columns as whole words
+            mask = df.columns.str.contains(pattern, regex=True)
+
+            # Use the mask to select the desired columns
+            df = df.loc[:, mask]
+            
     elif restrict_targets:
         restrict_deps = restrict_to.split(";")
         df = df[["Row.name"] + restrict_deps]

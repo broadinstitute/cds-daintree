@@ -1,7 +1,7 @@
 {
-  "RNAi": {
-    "name": "RNAi",
-    "taiga_filename": "predictability-legacy-datasets-8c54.14/RNAiDep",
+  "CRISPR": {
+    "name": "CRISPR",
+    "taiga_filename": "internal-24q2-3719.82/CRISPRGeneEffect",
     "table_type": "dep",
     "relation": "All"
   },
@@ -28,32 +28,32 @@
     "dim_type": "driverevents",
     "required": true,
     "exempt": false
-    },
-    "ArmLevelCN": {
-      "name": "ArmLevelCN",
-      "taiga_filename": "internal-24q2-3719.82/OmicsArmLevelCNA",
-      "table_type": "feature",
-      "dim_type": "armlevel",
-      "required": true,
-      "exempt": false
-    },
-    "CytobandCN": {
-      "name": "CytobandCN",
-      "taiga_filename": "predictability-76d5.99/PredictabilityGenticDerangementTransformed",
-      "table_type": "feature",
-      "dim_type": "cytoband",
-      "required": true,
-      "exempt": false
-    },
-    "GeneticSignature": {
-      "name": "GeneticSignature",
-      "taiga_filename": "internal-24q2-3719.82/OmicsSignatures",
-      "table_type": "feature",
-      "dim_type": "geneticsignature",
-      "required": true,
-      "exempt": false
-    },
-    "MutationsHotspot": {
+  },
+  "ArmLevelCN": {
+    "name": "ArmLevelCN",
+    "taiga_filename": "internal-24q2-3719.82/OmicsArmLevelCNA",
+    "table_type": "feature",
+    "dim_type": "armlevel",
+    "required": true,
+    "exempt": false
+  },
+  "CytobandCN": {
+    "name": "CytobandCN",
+    "taiga_filename": "predictability-76d5.99/PredictabilityGenticDerangementTransformed",
+    "table_type": "feature",
+    "dim_type": "cytoband",
+    "required": true,
+    "exempt": false
+  },
+  "GeneticSignature": {
+    "name": "GeneticSignature",
+    "taiga_filename": "internal-24q2-3719.82/OmicsSignatures",
+    "table_type": "feature",
+    "dim_type": "geneticsignature",
+    "required": true,
+    "exempt": false
+  },
+  "MutationsHotspot": {
     "name": "MutationsHotspot",
     "taiga_filename": "internal-24q2-3719.82/OmicsSomaticMutationsMatrixHotspot",
     "table_type": "feature",
@@ -84,13 +84,5 @@
     "dim_type": "gene",
     "required": false,
     "exempt": false
-  },
-  "RNASeq": {
-        "name": "RNASeq",
-        "taiga_filename": "internal-24q2-3719.82/OmicsExpressionProteinCodingGenesTPMLogp1",
-        "table_type": "feature",
-        "dim_type": "gene",
-        "required": true,
-        "exempt": false
-    }
+  }
 }

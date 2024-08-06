@@ -1,0 +1,23 @@
+{
+    "input": {
+        "name": "CellContext",
+        "data": {
+            "RNASeq": {
+                "taiga_filename":"internal-23q4-ac2b.21/OmicsExpressionProteinCodingGenesTPMLogp1",
+                "table_type":"feature",
+                "required":true,
+                "exempt":false
+            },
+            "RNAi": {
+                "taiga_filename":"demeter2-combined-dc9c.19/gene_means_proc",
+                "table_type":"dep",
+                "relation":"All"
+                }
+            }
+        },
+    "output": {
+        "prediction_matrix_taiga_id": "internal-24q2-3719.82/PredictionMatrixCellContext",
+        "ensemble_taiga_id": "internal-24q2-3719.82/EnsembleCellContext",
+        "featrure_metadata_taiga_id": "internal-24q2-3719.82/FeatureMetadataCellContext"
+        }
+}  

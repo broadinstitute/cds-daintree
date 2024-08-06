@@ -259,7 +259,7 @@ def _collect_and_fit(
     print("generating feature info...")
     print(ipt_dict)
     print("#######################")
-    feature_info_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_id"])
+    feature_info_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_type"])
     if test:
         print("and truncating datasets for testing...")
     for _, d in ipt_dict.items():
@@ -284,7 +284,7 @@ def _collect_and_fit(
                 "feature_label": feature_label,
                 "given_id": given_id,
                 "taiga_id": d["taiga_filename"],
-                "dim_id": d["dim_type"]
+                "dim_type": d["dim_type"]
             }, ignore_index=True)
         _df.to_csv(feature_info.set_index("dataset").loc[d["name"]].filename)
     
