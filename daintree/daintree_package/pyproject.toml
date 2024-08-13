@@ -20,11 +20,6 @@ typing-extensions = ">=3,<4"
 daintree = "daintree_package.main:main"
 
 
-[[tool.poetry.source]]
-name = "gcp-artifact-registry"
-url = "https://us-central1-python.pkg.dev/cds-artifacts/public-python/simple"
-priority = "explicit"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
