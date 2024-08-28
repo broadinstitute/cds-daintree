@@ -194,19 +194,17 @@ def gather_ensemble_tasks(
 
 
 def check_file_locs(ipt, config):
-    ipt_features = [d[1]["name"] for d in ipt.items()]
-    for _, model_config in config.items():
-        f_set = model_config["Features"]
-        f_set += model_config["Required"]
-
-        if model_config["Relation"] not in ["All", "MatchTarget"]:
-            f_set.append(model_config["Related"])
-
-        features = list(set(f_set))
+    ipt_features = list(ipt["data"].keys())
+    
+    for model_name, model_config in config.items():
+        f_set = set(model_config.get("Features", []) + model_config.get("Required", []))
+        
+        if model_config.get("Relation") not in ["All", "MatchTarget"]:
+            f_set.add(model_config.get("Related", ""))
+        
+        features = list(f_set)
         for f in features:
-            assert (
-                f in ipt_features
-            ), f"Feature {f} in model config file does not have corresponding input"
+            assert f in ipt_features, f"Feature {f} in model config file does not have corresponding input in {model_name}"
 
 
 def _collect_and_fit(
@@ -240,7 +238,7 @@ def _collect_and_fit(
 
     # make sure there is only one dependency dataset
     assert (
-        len([d[1] for d in ipt_dict.items() if (d[1]["table_type"] == "dep")]) == 1
+        len([v for v in ipt_dict["data"].values() if v.get("table_type") == "dep"]) == 1
     ), "Exactly one dataset labeled 'dep' is required"
 
     print("generating feature index and files...")
@@ -261,43 +259,39 @@ def _collect_and_fit(
     feature_info_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_type"])
     if test:
         print("and truncating datasets for testing...")
-    for _, d in ipt_dict.items():
-        if d["table_type"] not in ["feature", "relation"]:
+    for dataset_name, dataset_metadata in ipt_dict["data"].items():
+        if dataset_metadata["table_type"] not in ["feature", "relation"]:
             continue
-        _df = tc.get(d["taiga_filename"])
-        print(f"dataset: {d['name']}")
-        print(_df.head())
+        _df = tc.get(dataset_metadata["taiga_id"])
 
         if (related_dset is None) or (
-            (related_dset is not None) and d["name"] != related_dset
+            (related_dset is not None) and dataset_name != related_dset
         ):
             _df = process_biomarker_matrix(_df, 0, test)
-        print(f"processed dataset: {d['name']}")
+        print(f"processed dataset: {dataset_name}")
         print(_df.head())
 
         for col in _df.columns:
-            feature_name, feature_label, given_id = process_column_name(col, d["name"])
+            feature_name, feature_label, given_id = process_column_name(col, dataset_name)
             new_row = pd.DataFrame({
-                "model": [d["name"]],
+                "model": [dataset_name],
                 "feature_name": [feature_name],
                 "feature_label": [feature_label],
                 "given_id": [given_id],
-                "taiga_id": [d["taiga_filename"]],
-                "dim_type": [d["dim_type"]]
+                "taiga_id": [dataset_metadata["taiga_id"]],
+                "dim_type": [dataset_metadata["dim_type"]]
             })
             feature_info_df = pd.concat([feature_info_df, new_row], ignore_index=True)
-        _df.to_csv(feature_info.set_index("dataset").loc[d["name"]].filename)
+        _df.to_csv(feature_info.set_index("dataset").loc[dataset_name].filename)
     
     print("feature info generated")
     print("#######################")
 
     print("processing dependency data...")
     # load, process, and save dependency matrix
-    df_dep = tc.get(
-        [d[1] for d in ipt_dict.items() if (d[1]["table_type"] == "dep")][0][
-            "taiga_filename"
-        ]
-    )
+    dep_matrix_taiga_id = next((v.get("taiga_id") for v in ipt_dict["data"].values() if v.get("table_type") == "dep"), None)
+    print(f"dep_matrix_taiga_id: {dep_matrix_taiga_id}")
+    df_dep = tc.get(dep_matrix_taiga_id)
     df_dep = process_dep_matrix(df_dep, test, restrict_targets, restrict_to)
     df_dep.to_feather(save_pref / "dep.ftr")
 
@@ -382,12 +376,6 @@ def _collect_and_fit(
     required=True,
     help="JSON file containing the set of files for prediction",
 )
-@click.option(
-    "--model-name",
-    required=True,
-    default="Model",
-    help="Name of the model to be generated",
-)
 @click.option("--sparkles-path", required=True, help="path to the sparkles command")
 @click.option(
     "--sparkles-config", required=True, help="path to the sparkles config file to use"
@@ -430,7 +418,6 @@ def _collect_and_fit(
 )
 def collect_and_fit_generate_config(
     input_files,
-    model_name,
     sparkles_path,
     sparkles_config,
     save_dir=None,
@@ -447,7 +434,7 @@ def collect_and_fit_generate_config(
     if save_dir is not None:
         save_pref /= save_dir
         save_pref.mkdir(parents=True, exist_ok=True)
-    config = generate_config(ipt_dict, name=model_name, relation="All", )
+    config = generate_config(ipt_dict, relation="All")
     dt_hash = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
     model_config_name = "model-config" + "_temp_" + ".yaml"
 
