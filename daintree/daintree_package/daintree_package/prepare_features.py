@@ -3,8 +3,8 @@ from typing import Dict, Iterable, List, Mapping, Optional, Set, Tuple
 import numpy as np
 import pandas as pd
 
-from data_models import ModelConfig, FeatureInfo
-from parsing_utilities import (
+from .data_models import ModelConfig, FeatureInfo
+from .parsing_utilities import (
     GENE_LABEL_FORMAT,
     read_dataframe,
     split_gene_label_series,

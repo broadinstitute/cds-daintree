@@ -6,7 +6,6 @@ authors = ["Nayeem Aquib <naquib@broadinsitute.org>"]
 readme = "README.md"
 packages = [{include = "daintree"}]
 
-
 [tool.poetry.dependencies]
 python = "^3.12"
 pandas = "1.5.3"
@@ -14,7 +13,6 @@ click = "^8.1.7"
 numpy = "^1.25.1"
 scikit-learn = "1.5.1"
 taigapy = {version = "3.8.3", source = "gcp-artifact-registry"}
-
 
 [[tool.poetry.source]]
 name = "gcp-artifact-registry"
@@ -24,3 +22,6 @@ priority = "explicit"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+daintree-fit-models="daintree.daintree_fit_models:main"

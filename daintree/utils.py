@@ -20,11 +20,24 @@ def process_column_name(col, feature_dataset_name):
     match = re.match(r"(.+?) \((\d+)\)", col)
     if match:
         feature_label, given_id = match.groups()
-        feature_name = f"{feature_label}_({given_id})_{feature_dataset_name}"
+        feature_name = f"{feature_label.replace('-', '_')}_({given_id})_{feature_dataset_name}"
+        # feature_name = f"{feature_label}_({given_id})_{feature_dataset_name}"
+        # print(f"Gene name match: {feature_name}")
+    elif feature_dataset_name == "Lineage":
+        feature_label = col
+        given_id = col
+        feature_name = re.sub(r'[^\w/,]+', '_', col) + f"_{feature_dataset_name}"
+        # print(f"Gene name no match feature name: {feature_name}")
+    elif feature_dataset_name == "CytobandCN":
+        feature_label = col
+        given_id = col
+        feature_name = re.sub(r'[^\w.]+', '_', col) + f"_{feature_dataset_name}"
+        # print(f"Gene name no match: {feature_name}")
     else:
         feature_label = col
         given_id = col
         feature_name = re.sub(r'[^\w]+', '_', col) + f"_{feature_dataset_name}"
+        # print(f"Gene name no match: {feature_name}")
     return feature_name, feature_label, given_id
 
 
@@ -34,14 +47,6 @@ def process_biomarker_matrix(df, index_col=0, test=False):
     print("Start Processing Biomarker Matrix")
     if test:
         df = df.iloc[:, :]
-        # # Create a regex pattern with word boundaries
-        # pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns) + r')\b'
-
-        # # Create a boolean mask for columns that contain any of the filter_columns as whole words
-        # mask = df.columns.str.contains(pattern, regex=True)
-
-        # # Use the mask to select the desired columns
-        # df = df.loc[:, mask]
     print(df.head())
     print("End Processing Biomarker Matrix")
     df.to_csv("features.csv", index=False)
@@ -108,35 +113,41 @@ def partiton_inputs(dep_matrix, ensemble_config, save_pref, out_name="partitions
     param_df.to_csv(save_pref / out_name, index=False)
 
 
-def generate_config(ipt_dicts, relation="All", name="Model"):
-    # input json format:
-    # {'name':name, 'taiga_filename':taiga_filename, 'categorical': False, 'required': False, 'match_with': False, 'exempt': False, 'dep_or_feature':'feature'}
+def generate_config(input_dict, relation="All"):
+    name = input_dict["name"]
+    data = input_dict["data"]
+
     features = [
-        ipt_dicts[d]["name"]
-        for d in ipt_dicts
-        if (ipt_dicts[d]["table_type"] == "feature")
+        key for key, value in data.items()
+        if value.get("table_type") == "feature"
     ]
     required = [
-        ipt_dicts[d]["name"]
-        for d in ipt_dicts
-        if ((ipt_dicts[d]["table_type"] == "feature") and ipt_dicts[d]["required"])
+        key for key, value in data.items()
+        if value.get("table_type") == "feature" and value.get("required", False)
     ]
     exempt = [
-        ipt_dicts[d]["name"]
-        for d in ipt_dicts
-        if ((ipt_dicts[d]["table_type"] == "feature") and ipt_dicts[d]["exempt"])
+        key for key, value in data.items()
+        if value.get("table_type") == "feature" and value.get("exempt", False)
     ]
-    model_config = dict()
-    model_config["Features"] = features
-    model_config["Required"] = required
-    model_config["Relation"] = relation
+    relation = next(
+        (value["relation"] for value in data.values() if value.get("table_type") == "dep"),
+        "All"
+    )
+    model_config = {
+        "Features": features,
+        "Required": required,
+        "Relation": relation,
+        "Jobs": 10
+    }
+    
     if relation == "MatchRelated":
-        model_config["Related"] = [
-            ipt_dicts[d]["name"]
-            for d in ipt_dicts
-            if ((ipt_dicts[d]["table_type"] == "relation"))
-        ][0]
-    model_config["Jobs"] = 10
+        related = next(
+            (key for key, value in data.items() if value.get("table_type") == "relation"),
+            None
+        )
+        if related:
+            model_config["Related"] = related
+    
     if exempt:
         model_config["Exempt"] = exempt
 
@@ -144,7 +155,10 @@ def generate_config(ipt_dicts, relation="All", name="Model"):
 
 
 def generate_feature_info(ipt_dicts, save_pref):
-    dsets = [d[1]["name"] for d in ipt_dicts.items() if (d[1]["table_type"] != "dep")]
+    dsets = []
+    for dset_name, dset_value in ipt_dicts["data"].items():
+        if dset_value["table_type"] == "feature":
+            dsets.append(dset_name)
     fnames = [str(save_pref / (dset + ".csv")) for dset in dsets]
 
     df = pd.DataFrame({"dataset": dsets, "filename": fnames,})

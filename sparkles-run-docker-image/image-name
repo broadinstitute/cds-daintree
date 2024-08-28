@@ -1,1 +1,1 @@
-DOCKER_IMAGE=us.gcr.io/broad-achilles/daintree-sparkles:v0
+DOCKER_IMAGE=us.gcr.io/broad-achilles/daintree-sparkles:v3

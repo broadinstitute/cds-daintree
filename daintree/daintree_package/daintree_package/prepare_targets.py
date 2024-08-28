@@ -2,7 +2,7 @@ from typing import List, Optional
 
 import pandas as pd
 
-from parsing_utilities import split_gene_label_series
+from .parsing_utilities import split_gene_label_series
 
 
 def prepare_targets(
