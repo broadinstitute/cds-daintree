@@ -18,7 +18,6 @@ from utils import (
     process_column_name,
 )
 from taiga_utils import update_taiga
-from validate_run import validate_run
 
 
 ensemble_filename = "ensemble.csv"
@@ -88,21 +87,21 @@ default_url_prefix=$(awk -F "=" '/default_url_prefix/ {print $2}' "$sparkles_con
 )
 
 
-# def validate_run(dt_hash, sparkles_path, sparkles_config, save_pref):
-#     validate_cmd = validate_str.safe_substitute(
-#         {
-#             "sparkles_config": sparkles_config,
-#             "sparkles_path": sparkles_path,
-#             "HASH": dt_hash,
-#             "save_pref": save_pref,
-#         }
-#     )
-#     with open("validate.sh", "wt") as f:
-#         f.write(validate_cmd)
-#         f.close()
+def validate_run(dt_hash, sparkles_path, sparkles_config, save_pref):
+    validate_cmd = validate_str.safe_substitute(
+        {
+            "sparkles_config": sparkles_config,
+            "sparkles_path": sparkles_path,
+            "HASH": dt_hash,
+            "save_pref": save_pref,
+        }
+    )
+    with open("validate.sh", "wt") as f:
+        f.write(validate_cmd)
+        f.close()
 
-#     # subprocess.check_call(validate_cmd, shell=True)
-#     subprocess.check_call("bash validate.sh", shell=True)
+    # subprocess.check_call(validate_cmd, shell=True)
+    subprocess.check_call("bash validate.sh", shell=True)
 
 
 def save_and_run_bash(cmd_template, sub_dict):
