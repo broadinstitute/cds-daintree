@@ -18,7 +18,6 @@ from utils import (
     process_column_name,
 )
 from taiga_utils import update_taiga
-from validate_run import validate_run
 
 
 ensemble_filename = "ensemble.csv"
@@ -38,9 +37,9 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.extend(["--config", sparkles_config])
     cmd.append("sub")
     cmd.extend(
-        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v3"]
+        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v2"]
     )
-    cmd.extend(["-u", "/daintree/daintree/daintree_package/daintree_package/main.py"])
+    cmd.extend(["-u", "/daintree/daintree_package/daintree_package/main.py"])
     cmd.extend(["-u", str(save_pref / "dep.ftr") + ":target.ftr"])
     cmd.extend(["-u", str(save_pref / config_fname) + ":model-config.yaml"])
     cmd.extend(["-u", str(save_pref / "X.ftr") + ":X.ftr"])
@@ -88,21 +87,21 @@ default_url_prefix=$(awk -F "=" '/default_url_prefix/ {print $2}' "$sparkles_con
 )
 
 
-# def validate_run(dt_hash, sparkles_path, sparkles_config, save_pref):
-#     validate_cmd = validate_str.safe_substitute(
-#         {
-#             "sparkles_config": sparkles_config,
-#             "sparkles_path": sparkles_path,
-#             "HASH": dt_hash,
-#             "save_pref": save_pref,
-#         }
-#     )
-#     with open("validate.sh", "wt") as f:
-#         f.write(validate_cmd)
-#         f.close()
+def validate_run(dt_hash, sparkles_path, sparkles_config, save_pref):
+    validate_cmd = validate_str.safe_substitute(
+        {
+            "sparkles_config": sparkles_config,
+            "sparkles_path": sparkles_path,
+            "HASH": dt_hash,
+            "save_pref": save_pref,
+        }
+    )
+    with open("validate.sh", "wt") as f:
+        f.write(validate_cmd)
+        f.close()
 
-#     # subprocess.check_call(validate_cmd, shell=True)
-#     subprocess.check_call("bash validate.sh", shell=True)
+    # subprocess.check_call(validate_cmd, shell=True)
+    subprocess.check_call("bash validate.sh", shell=True)
 
 
 def save_and_run_bash(cmd_template, sub_dict):
