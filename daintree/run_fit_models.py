@@ -81,7 +81,7 @@ mkdir -p $save_pref/data
 default_url_prefix=$(awk -F "=" '/default_url_prefix/ {print $2}' "$sparkles_config")
 /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file /root/.sparkles-cache/service-keys/broad-achilles.json
 /google-cloud-sdk/bin/gcloud storage ls ${default_url_prefix}/ensemble_$HASH/*/*.csv > $save_pref/completed_jobs.txt
-/install/depmap-py/bin/python3.9 validate_jobs_complete.py $save_pref/completed_jobs.txt $save_pref/partitions.csv features.csv predictions.csv
+/install/depmap-py/bin/python3.9 daintree/validate_jobs_complete.py $save_pref/completed_jobs.txt $save_pref/partitions.csv features.csv predictions.csv
 /google-cloud-sdk/bin/gcloud storage cp ${default_url_prefix}/ensemble_$HASH/*/*.csv $save_pref/data
 """
 )
