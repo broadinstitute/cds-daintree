@@ -1,7 +1,6 @@
 .DS_Store
 *.pyc
 output_data/*
-sparkles-config
 sparkles.log
 *.csv
 bash_cmd.sh
