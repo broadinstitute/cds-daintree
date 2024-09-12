@@ -2,22 +2,30 @@
     "input": {
         "name": "CellContext",
         "data": {
-            "RNASeq": {
-                "taiga_filename":"internal-23q4-ac2b.21/OmicsExpressionProteinCodingGenesTPMLogp1",
-                "table_type":"feature",
-                "required":true,
-                "exempt":false
-            },
-            "RNAi": {
-                "taiga_filename":"demeter2-combined-dc9c.19/gene_means_proc",
-                "table_type":"dep",
+            "CRISPR": {
+                "taiga_id":"internal-24q2-3719.82/CRISPRGeneEffect",
+                "table_type":"target_matrix",
                 "relation":"All"
-                }
+            },
+            "Lineage": {
+                "taiga_id": "predictability-76d5.94/PredictabilityLineageTransformed",
+                "table_type": "feature",
+                "dim_type": "lineage",
+                "required": true,
+                "exempt": false
+            },
+            "Confounder": {
+                "taiga_id": "predictability-76d5.111/PredictabilityCRISPRConfoundersTransformed",
+                "table_type": "feature",
+                "dim_type": "confounder",
+                "required": true,
+                "exempt": false
             }
-        },
-    "output": {
-        "prediction_matrix_taiga_id": "internal-24q2-3719.82/PredictionMatrixCellContext",
-        "ensemble_taiga_id": "internal-24q2-3719.82/EnsembleCellContext",
-        "featrure_metadata_taiga_id": "internal-24q2-3719.82/FeatureMetadataCellContext"
         }
+    },
+    "output": {
+        "prediction_matrix_taiga_id": "predictability-76d5.111/CellContext_predictions_crispr",
+        "ensemble_taiga_id": "predictability-76d5.111/ensemble_crispr",
+        "feature_metadata_taiga_id": "predictability-76d5.111/feature_metadata_crispr_new"
+    }
 }  

@@ -3,7 +3,7 @@
     "data": {
         "CRISPR": {
             "taiga_id":"internal-24q2-3719.82/CRISPRGeneEffect",
-            "table_type":"dep",
+            "table_type":"target_matrix",
             "relation":"All"
         },
         "Lineage": {

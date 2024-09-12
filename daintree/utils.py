@@ -66,15 +66,15 @@ def process_dep_matrix(df, test=False, restrict_targets=False, restrict_to=None)
             restrict_deps = restrict_to.split(";")
             df = df[["Row.name"] + restrict_deps]
         else:
-            # df = df.iloc[:, :TEST_GENE_LIMIT+1]
+            df = df.iloc[:, :TEST_GENE_LIMIT+1]
             # Create a regex pattern with word boundaries
-            pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns) + r')\b'
+            # pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns) + r')\b'
 
             # Create a boolean mask for columns that contain any of the filter_columns as whole words
-            mask = df.columns.str.contains(pattern, regex=True)
+            # mask = df.columns.str.contains(pattern, regex=True)
 
             # Use the mask to select the desired columns
-            df = df.loc[:, mask]
+            # df = df.loc[:, mask]
             
     elif restrict_targets:
         restrict_deps = restrict_to.split(";")
@@ -130,7 +130,7 @@ def generate_config(input_dict, relation="All"):
         if value.get("table_type") == "feature" and value.get("exempt", False)
     ]
     relation = next(
-        (value["relation"] for value in data.values() if value.get("table_type") == "dep"),
+        (value["relation"] for value in data.values() if value.get("table_type") == "target_matrix"),
         "All"
     )
     model_config = {
