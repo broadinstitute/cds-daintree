@@ -40,7 +40,7 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
         ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v3"]
     )
     cmd.extend(["-u", "/daintree/daintree/daintree_package/daintree_package/main.py"])
-    cmd.extend(["-u", str(save_pref / "dep.ftr") + ":target.ftr"])
+    cmd.extend(["-u", str(save_pref / "target_matrix.ftr") + ":target.ftr"])
     cmd.extend(["-u", str(save_pref / config_fname) + ":model-config.yaml"])
     cmd.extend(["-u", str(save_pref / "X.ftr") + ":X.ftr"])
     if related:
@@ -116,7 +116,7 @@ def save_and_run_bash(cmd_template, sub_dict):
 
 def gather_ensemble_tasks(
     save_pref,
-    targets="dep.ftr",
+    targets="target_matrix.ftr",
     data_dir="data",
     partitions="partitions.csv",
     features_suffix="features.csv",
@@ -238,8 +238,8 @@ def _collect_and_fit(
 
     # make sure there is only one dependency dataset
     assert (
-        len([v for v in ipt_dict["data"].values() if v.get("table_type") == "dep"]) == 1
-    ), "Exactly one dataset labeled 'dep' is required"
+        len([v for v in ipt_dict["data"].values() if v.get("table_type") == "target_matrix"]) == 1
+    ), "Exactly one dataset labeled 'target_matrix' is required"
 
     print("generating feature index and files...")
     # generate feature info table
@@ -289,11 +289,11 @@ def _collect_and_fit(
 
     print("processing dependency data...")
     # load, process, and save dependency matrix
-    dep_matrix_taiga_id = next((v.get("taiga_id") for v in ipt_dict["data"].values() if v.get("table_type") == "dep"), None)
+    dep_matrix_taiga_id = next((v.get("taiga_id") for v in ipt_dict["data"].values() if v.get("table_type") == "target_matrix"), None)
     print(f"dep_matrix_taiga_id: {dep_matrix_taiga_id}")
     df_dep = tc.get(dep_matrix_taiga_id)
     df_dep = process_dep_matrix(df_dep, test, restrict_targets, restrict_to)
-    df_dep.to_feather(save_pref / "dep.ftr")
+    df_dep.to_feather(save_pref / "target_matrix.ftr")
 
     # generate feature info file
     feature_info.to_csv(save_pref / "feature_info.csv")
@@ -312,12 +312,12 @@ def _collect_and_fit(
             "/install/depmap-py/bin/daintree", 
             "prepare-y",
             "--input",
-            str(save_pref / "dep.ftr"),
+            str(save_pref / "target_matrix.ftr"),
             "--output",
-            str(save_pref / "dep-filtered.ftr"),
+            str(save_pref / "target_matrix_filtered.ftr"),
         ]
     )
-    # prepare_y(input="dep.ftr", output="dep-filtered.ftr")
+    # prepare_y(input="target_matrix.ftr", output="target_matrix_filtered.ftr")
     # pytest.set_trace()
     print('running "prepare_x"...')
     prep_x_cmd = [
@@ -326,7 +326,7 @@ def _collect_and_fit(
         "--model-config",
         str(ensemble_config),
         "--targets",
-        str(save_pref / "dep-filtered.ftr"),
+        str(save_pref / "target_matrix_filtered.ftr"),
         "--feature-info",
         str(save_pref / "feature_info.csv"),
         "--output",
@@ -356,7 +356,7 @@ def _collect_and_fit(
         save_and_run_bash(validate_str, validate_dict)
         # gather the ensemble results and collect the top features
         df_ensemble, df_predictions = gather_ensemble_tasks(
-            save_pref, targets=str(save_pref / "dep.ftr"), top_n=10
+            save_pref, targets=str(save_pref / "target_matrix.ftr"), top_n=10
         )
         df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
         if upload_to_taiga:

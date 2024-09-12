@@ -130,7 +130,7 @@ def generate_config(input_dict, relation="All"):
         if value.get("table_type") == "feature" and value.get("exempt", False)
     ]
     relation = next(
-        (value["relation"] for value in data.values() if value.get("table_type") == "dep"),
+        (value["relation"] for value in data.values() if value.get("table_type") == "target_matrix"),
         "All"
     )
     model_config = {
