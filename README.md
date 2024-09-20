@@ -10,7 +10,7 @@ daintree_fit_models.py --config model-map.json --out /daintree/output_data/nayee
 ```
 ##### Required parameters
 
-* `--config`: A JSON file describing how to train the models. See Model config file below for a description of the format of this file. You can specify this parameter multiple times for fitting multiple types of models in a single submission.
+* `--config`: A JSON file describing how to train the models. See [Model Config File](#model-config-file) below for a description of the format of this file. You can specify this parameter multiple times for fitting multiple types of models in a single submission.
 * `--out`: The directory to write the output to.
 
 ##### Optional Parameters
@@ -40,7 +40,7 @@ The primary input you need to provide here is the MODEL_CONFIG which is a JSON f
   }
 }
 ```
-For example, in case of the CellContext model where the target matrix is crispr, it should be formatted as following:
+**Example**:
 ```
 {
   "name": "CellContext",
@@ -69,7 +69,21 @@ For example, in case of the CellContext model where the target matrix is crispr,
 ```
 Note: This file needs to have at least one feature matrix(specified as `type=feature`) and one target matrix(`type=target_matrix`) with taiga ids.
 
-## Output
+### File Formats
+Both Feature and target datasets/matrices should have samples as the row header/index and feature names as the column headers.
+
+**Example**
+```
+,SOX10 (6663),NRAS (4893),BRAF (673)
+ACH-000001,0,0.5,0.5
+ACH-000002,0.6,0.6,0.7
+ACH-000003,0.3,0.4,0.4
+```
+
+### Output
 
 Once the `daintree_fit_models` is run, the provided `out` path directory will be populated with the X matrix as a feather file, the downloaded feature matrices as csv files, the feature metadata as `feature_metadata.csv` file, but most importantly the predictions with pearson correlation in a file named `ensemble.csv`.
 
+## Issues
+
+If you face any issues running daintree, then please reach out to cds-softeng@broadinstitute.org
