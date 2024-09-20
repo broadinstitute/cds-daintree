@@ -22,9 +22,9 @@ daintree_fit_models.py --config model-map.json --out /daintree/output_data/nayee
 * `--sparkles-config <PATH>`: Path to sparkles config file (Defaults to `/daintree/sparkles-config`)
 * `--test`: A boolean flag that takes either `True` or `False`. When `True` is selected only a small subset of target variables will be used. (Defaults to `True`)
 * `--skipfit`: A boolean flag that takes either `True` or `False`. Specify if you want to skip the actual model fitting process. (Defaults to `True`)
-* `--upload-to-taiga`: The taiga id where the output ensemble, feature metadata, and predictions to be uploaded. (Deafaults to `None`)
+* `--upload-to-taiga`: The taiga id where the output ensemble, feature metadata, and predictions to be uploaded. (Defaults to `None`)
 ``
-### Model config file
+### Model Config File
 The primary input you need to provide here is the MODEL_CONFIG which is a JSON file listing the datasets to pull from. It follows the following format:
 ```
 {
