@@ -35,11 +35,11 @@ def main():
     parser = argparse.ArgumentParser(description="Run daintree fit models in a Docker container")
     
     # Mandatory arguments
-    parser.add_argument("--image", required=True, help="Docker image name")
     parser.add_argument("--config", required=True, help="Model configuration file")
     parser.add_argument("--out", required=True, help="Output directory")
     
     # Optional arguments
+    parser.add_argument("--image", default="us.gcr.io/broad-achilles/daintree-sparkles:v3", help="Docker image name")
     parser.add_argument("--taiga-dir", default="~/.taiga", help="Path to Taiga token and cache")
     parser.add_argument("--sparkles-cache", default="~/.sparkles-cache", help="Path to Sparkles cache")
     parser.add_argument("--sparkles-path", default="/install/sparkles/bin/sparkles", help="Path to Sparkles executable")

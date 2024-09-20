@@ -4,47 +4,72 @@ Make sure that you have the following files:
 1. Taiga token.
 2. Sparkles config file.  
 ## Usage
-Now to run the fit predictive model, you can run:  
+To fit a set of predictive models, you can run:
 ```
-docker run -w /daintree \ 
-            --pull=always \
-            -v "$PWD":/daintree \
-            -v ~/.taiga:/root/.taiga \
-            -v ~/.sparkles-cache:/root/.sparkles-cache \
-            us.gcr.io/broad-achilles/daintree-sparkles:v1 \
-            /install/depmap-py/bin/python3.9 -u run_fit_models.py collect-and-fit-generate-config \
-            --input-files model-map.json \
-            --sparkles-path /install/sparkles/bin/sparkles \
-            --sparkles-config /daintree/sparkles-config \
-            --save-dir /daintree/output_data/nayeem-test \
-            --test True \
-            --model-name CellContext \
-            --skipfit False \
-            --upload-to-taiga predictability-76d5
+daintree_fit_models.py --config model-map.json --out /daintree/output_data/nayeem-test
 ```
+##### Required parameters
 
-The primary input you need to provide here is the `model-map.json` which looks like the following:
+* `--config`: A JSON file describing how to train the models. See Model config file below for a description of the format of this file. You can specify this parameter multiple times for fitting multiple types of models in a single submission.
+* `--out`: The directory to write the output to.
+
+##### Optional Parameters
+
+* `--image`: The docker image built with this version of daintree which will be used to launch the sparkles job as well as run on the remote worker hosts. (Defaults to `us.gcr.io/broad-achilles/daintree-sparkles:v3`).
+* `--taiga-dir <PATH>`: Path to where Taiga token and cache is stored. (Defaults to `~/.taiga`)
+* `--sparkles-cache <PATH>`: Path to where sparkles stores cached data. (Defaults to `~/.sparkles-cache`)
+* `--sparkles-path <PATH>`: Path to sparkles executable. This may change depending on where sparkles is installed inside the docker container. (Defaults to `/install/sparkles/bin/sparkles`). 
+* `--sparkles-config <PATH>`: Path to sparkles config file (Defaults to `/daintree/sparkles-config`)
+* `--test`: A boolean flag that takes either `True` or `False`. When `True` is selected only a small subset of target variables will be used. (Defaults to `True`)
+* `--skipfit`: A boolean flag that takes either `True` or `False`. Specify if you want to skip the actual model fitting process. (Defaults to `True`)
+* `--upload-to-taiga`: The taiga id where the output ensemble, feature metadata, and predictions to be uploaded. (Deafaults to `None`)
+``
+### Model config file
+The primary input you need to provide here is the MODEL_CONFIG which is a JSON file listing the datasets to pull from. It follows the following format:
 ```
 {
-    "RNASeq": {"name":"RNASeq",
-                "taiga_filename":"internal-23q4-ac2b.21/OmicsExpressionProteinCodingGenesTPMLogp1",
-                "table_type":"feature",
-                "required":true,
-                "exempt":false,
-                "dim_type": "rnaseq"
-            },
-    "RNAi": {"name":"RNAi",
-            "taiga_filename":"demeter2-combined-dc9c.19/gene_means_proc",
-            "table_type":"dep",
-            "relation":"All"}
-    }
+  "name": [MODEL NAME],
+  "data": {
+      [DATASET NAME]: {
+          "taiga_id": [TAIGA ID OF THE DATASET],
+          "table_type": [TYPE OF DATASET(This is either feature or target_matrix)],
+          "dim_type": [TYPE OF DIMENSION IN BREADBOX(Usually "gene")],
+          "required": [BOOLEAN(true or false)],
+          "exempt": [BOOLEAN(true or false)]
+      }
+  }
+}
 ```
-This file needs to have at least one feature matrix and one target matrix with taiga ids. The other important flags are following:
+For example, in case of the CellContext model where the target matrix is crispr, it should be formatted as following:
+```
+{
+  "name": "CellContext",
+  "data": {
+      "CRISPR": {
+          "taiga_id":"internal-24q2-3719.82/CRISPRGeneEffect",
+          "table_type":"target_matrix",
+          "relation":"All"
+      },
+      "Lineage": {
+          "taiga_id": "predictability-76d5.94/PredictabilityLineageTransformed",
+          "table_type": "feature",
+          "dim_type": "lineage",
+          "required": true,
+          "exempt": false
+      },
+      "Confounder": {
+          "taiga_id": "predictability-76d5.111/PredictabilityCRISPRConfoundersTransformed",
+          "table_type": "feature",
+          "dim_type": "confounder",
+          "required": true,
+          "exempt": false
+      }
+    }
+  }
+```
+Note: This file needs to have at least one feature matrix(specified as `type=feature`) and one target matrix(`type=target_matrix`) with taiga ids.
 
-* `--sparkles-config`: Your local sparkles config path.
-* `--save-dir`: The location of the output to save.
-* `--test`: If you want to run at a small scale on a test basis, then choose True. You can configure how many genes you want.
-* `--model-name`: The name of the model. The default name is "Model".
-* `--skipfit`: This is a boolean flag. If you don't want to run the fit function then choose True. 
-* `--upload-to-taiga`: The taiga id where the output matrix and feature metadata to be uploaded. 
+## Output
+
+Once the `daintree_fit_models` is run, the provided `out` path directory will be populated with the X matrix as a feather file, the downloaded feature matrices as csv files, the feature metadata as `feature_metadata.csv` file, but most importantly the predictions with pearson correlation in a file named `ensemble.csv`.
 
