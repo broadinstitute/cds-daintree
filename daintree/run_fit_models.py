@@ -228,7 +228,6 @@ def _collect_and_fit(
     with open(input_files, "r") as f:
         ipt_dict = json.load(f)
         f.close()
-
     with open(ensemble_config, "r") as f:
         config_dict = yaml.load(f, yaml.SafeLoader)
         f.close()
@@ -254,9 +253,9 @@ def _collect_and_fit(
     if out_rel:
         related_dset = list(set(relations).difference(set(["All", "MatchTarget"])))[0]
     print("generating feature info...")
-    print(ipt_dict)
     print("#######################")
     feature_info_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_type"])
+    model_name = ipt_dict["name"]
     if test:
         print("and truncating datasets for testing...")
     for dataset_name, dataset_metadata in ipt_dict["data"].items():
@@ -274,7 +273,7 @@ def _collect_and_fit(
         for col in _df.columns:
             feature_name, feature_label, given_id = process_column_name(col, dataset_name)
             new_row = pd.DataFrame({
-                "model": [dataset_name],
+                "model": [model_name],
                 "feature_name": [feature_name],
                 "feature_label": [feature_label],
                 "given_id": [given_id],
