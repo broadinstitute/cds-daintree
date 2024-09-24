@@ -23,20 +23,21 @@ def process_column_name(col, feature_dataset_name):
         feature_name = f"{feature_label.replace('-', '_')}_({given_id})_{feature_dataset_name}"
         # feature_name = f"{feature_label}_({given_id})_{feature_dataset_name}"
         # print(f"Gene name match: {feature_name}")
-    elif feature_dataset_name == "Lineage":
-        feature_label = col
-        given_id = col
-        feature_name = re.sub(r'[^\w/,]+', '_', col) + f"_{feature_dataset_name}"
-        # print(f"Gene name no match feature name: {feature_name}")
-    elif feature_dataset_name == "CytobandCN":
-        feature_label = col
-        given_id = col
-        feature_name = re.sub(r'[^\w.]+', '_', col) + f"_{feature_dataset_name}"
-        # print(f"Gene name no match: {feature_name}")
+    # elif feature_dataset_name == "Lineage":
+    #     feature_label = col
+    #     given_id = col
+    #     feature_name = re.sub(r'[^\w/,]+', '_', col) + f"_{feature_dataset_name}"
+    #     # print(f"Gene name no match feature name: {feature_name}")
+    # elif feature_dataset_name == "CytobandCN":
+    #     feature_label = col
+    #     given_id = col
+    #     feature_name = re.sub(r'[^\w.]+', '_', col) + f"_{feature_dataset_name}"
+    #     # print(f"Gene name no match: {feature_name}")
     else:
         feature_label = col
         given_id = col
-        feature_name = re.sub(r'[^\w]+', '_', col) + f"_{feature_dataset_name}"
+        feature_name = re.sub(r'[\s-]+', '_', col) + f"_{feature_dataset_name}"
+        # feature_name = re.sub(r'[^\w]+', '_', col) + f"_{feature_dataset_name}"
         # print(f"Gene name no match: {feature_name}")
     return feature_name, feature_label, given_id
 
