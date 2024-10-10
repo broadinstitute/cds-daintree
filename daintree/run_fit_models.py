@@ -121,7 +121,7 @@ def gather_ensemble_tasks(
     partitions="partitions.csv",
     features_suffix="features.csv",
     predictions_suffix="predictions.csv",
-    top_n=10,
+    top_n=50,
 ):
 
     targets = pd.read_feather(save_pref / targets)
@@ -138,6 +138,7 @@ def gather_ensemble_tasks(
         + partitions["end"].map(str)
         + "_"
     )
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
     partitions["feature_path"] = save_pref / (
         partitions["path_prefix"] + features_suffix
     )
@@ -163,8 +164,19 @@ def gather_ensemble_tasks(
         predictions = pd.DataFrame().join(
             [pd.read_csv(f, index_col=0) for f in predictions_filenames], how="outer"
         )
-
+        print("############################################")
+        print("############################################")
+        print("PREDICTIONS")
+        print(predictions.shape)
+        print(predictions.head())
+        print("TARGETS")
+        print(targets.shape)
+        print(targets.head())
         cors = predictions.corrwith(targets)
+        print("CORRELATIONS")
+        print(cors)
+        print("############################################")
+        print("############################################")
 
         # Reshape
         cors = (
@@ -177,7 +189,9 @@ def gather_ensemble_tasks(
         all_cors.append(cors)
 
     all_cors = pd.concat(all_cors, ignore_index=True)
+    all_cors.to_csv(save_pref / "all_cors.csv", index=False)
     ensemble = all_features.merge(all_cors, on=["gene", "model"])
+    ensemble.to_csv(save_pref / "old_ensemble.csv", index=False)
 
     # Get the highest correlation across models per "gene" (entity)
     ensemble["best"] = ensemble.groupby("gene")["pearson"].rank(ascending=False) == 1
@@ -356,7 +370,7 @@ def _collect_and_fit(
         save_and_run_bash(validate_str, validate_dict)
         # gather the ensemble results and collect the top features
         df_ensemble, df_predictions = gather_ensemble_tasks(
-            save_pref, targets=str(save_pref / "dep.ftr"), top_n=10
+            save_pref, targets=str(save_pref / "target_matrix.ftr"), top_n=50
         )
         df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
         if upload_to_taiga:
