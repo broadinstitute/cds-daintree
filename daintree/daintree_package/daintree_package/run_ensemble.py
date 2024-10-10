@@ -140,7 +140,7 @@ def single_fit(
     model_types,
     splitter,
     scoring,
-    nfeatures=10,
+    nfeatures=50,
     rounding=False,
     return_models=False,
 ):
@@ -337,7 +337,7 @@ class EnsembleRegressor:
         for i in range(self.nfolds):
             columns.append("score%i" % i)
         columns.append("best")
-        for i in range(10):
+        for i in range(50):
             columns.extend(["feature%i" % i, "feature%i_importance" % i])
 
         melted = pd.DataFrame(columns=columns)
@@ -350,7 +350,7 @@ class EnsembleRegressor:
                 }
                 for j in range(self.nfolds):
                     row["score%i" % j] = self.scores[gene][i][j]
-                for j in range(10):
+                for j in range(50):
                     try:
                         row["feature%i" % j] = self.important_features[gene][i].index[j]
                         row["feature%i_importance" % j] = self.important_features[gene][
@@ -359,7 +359,7 @@ class EnsembleRegressor:
                     except IndexError:
                         row["feature%i" % j] = np.nan
                         row["feature%i_importance" % j] = np.nan
-                melted = melted.append(row, ignore_index=True)
+                melted = pd.concat([melted, pd.DataFrame([row])], ignore_index=True)
         return melted
 
     def save_results(self, feat_outfile, pred_outfile):
