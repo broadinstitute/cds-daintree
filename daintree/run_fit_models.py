@@ -37,7 +37,7 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.extend(["--config", sparkles_config])
     cmd.append("sub")
     cmd.extend(
-        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v3"]
+        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v4"]
     )
     cmd.extend(["-u", "/daintree/daintree_package/daintree_package/main.py"])
     cmd.extend(["-u", str(save_pref / "target_matrix.ftr") + ":target.ftr"])
@@ -121,7 +121,7 @@ def gather_ensemble_tasks(
     partitions="partitions.csv",
     features_suffix="features.csv",
     predictions_suffix="predictions.csv",
-    top_n=10,
+    top_n=50,
 ):
 
     targets = pd.read_feather(save_pref / targets)
@@ -355,7 +355,7 @@ def _collect_and_fit(
         save_and_run_bash(validate_str, validate_dict)
         # gather the ensemble results and collect the top features
         df_ensemble, df_predictions = gather_ensemble_tasks(
-            save_pref, targets=str(save_pref / "target_matrix.ftr"), top_n=10
+            save_pref, targets=str(save_pref / "target_matrix.ftr"), top_n=50
         )
         df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
         if upload_to_taiga:

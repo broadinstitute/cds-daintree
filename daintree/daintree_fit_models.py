@@ -39,13 +39,13 @@ def main():
     parser.add_argument("--out", required=True, help="Output directory")
     
     # Optional arguments
-    parser.add_argument("--image", default="us.gcr.io/broad-achilles/daintree-sparkles:v3", help="Docker image name")
+    parser.add_argument("--image", default="us.gcr.io/broad-achilles/daintree-sparkles:v4", help="Docker image name")
     parser.add_argument("--taiga-dir", default="~/.taiga", help="Path to Taiga token and cache")
     parser.add_argument("--sparkles-cache", default="~/.sparkles-cache", help="Path to Sparkles cache")
     parser.add_argument("--sparkles-path", default="/install/sparkles/bin/sparkles", help="Path to Sparkles executable")
     parser.add_argument("--sparkles-config", default="/daintree/sparkles-config", help="Path to Sparkles config file")
     parser.add_argument("--test", type=str2bool, nargs='?', const=True, default=True, help="Run in test mode")
-    parser.add_argument("--skipfit", type=str2bool, nargs='?', const=True, default=True, help="Skip the model fitting process")
+    parser.add_argument("--skipfit", type=str2bool, nargs='?', const=True, default=False, help="Skip the model fitting process")
     
     args = parser.parse_args()
     
