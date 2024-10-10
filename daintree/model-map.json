@@ -1,24 +1,24 @@
 {
-  "name": "CellContext2",
-  "data": {
-      "Lineage": {
-          "taiga_id": "predictability-76d5.94/PredictabilityLineageTransformed",
-          "table_type": "feature",
-          "dim_type": "lineage",
-          "required": true,
-          "exempt": false
-      },
-      "Confounder": {
-            "taiga_id": "predictability-legacy-datasets-8c54.8/RNAiConfounders",
+    "name": "CellContext",
+    "data": {
+        "CRISPR": {
+            "taiga_id":"internal-24q2-3719.82/CRISPRGeneEffect",
+            "table_type":"target_matrix",
+            "relation":"All"
+        },
+        "Lineage": {
+            "taiga_id": "predictability-76d5.94/PredictabilityLineageTransformed",
+            "table_type": "feature",
+            "dim_type": "lineage",
+            "required": true,
+            "exempt": false
+        },
+        "Confounder": {
+            "taiga_id": "predictability-76d5.111/PredictabilityCRISPRConfoundersTransformed",
             "table_type": "feature",
             "dim_type": "confounder",
             "required": true,
             "exempt": false
-      },
-      "RNAi": {
-          "taiga_id":"predictability-legacy-datasets-8c54.14/RNAiDep",
-          "table_type":"dep",
-          "relation":"All"
-          }
-      }
-  }
+        }
+    }
+}

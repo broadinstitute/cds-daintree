@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--sparkles-path", default="/install/sparkles/bin/sparkles", help="Path to Sparkles executable")
     parser.add_argument("--sparkles-config", default="/daintree/sparkles-config", help="Path to Sparkles config file")
     parser.add_argument("--test", type=str2bool, nargs='?', const=True, default=True, help="Run in test mode")
-    parser.add_argument("--skipfit", type=str2bool, nargs='?', const=True, default=True, help="Skip the model fitting process")
+    parser.add_argument("--skipfit", type=str2bool, nargs='?', const=True, default=False, help="Skip the model fitting process")
     
     args = parser.parse_args()
     
