@@ -217,6 +217,14 @@ def single_fit(
     if not return_models:
         target_models = [np.nan for i in range(len(scores))]
     print("HHHHHHHHHH")
+    print({
+        "models": target_models,
+        "best": best_index,
+        "scores": scores,
+        "features": features,
+        "predictions": prediction,
+        "feature_correlations": feature_correlations,
+    })
     return {
         "models": target_models,
         "best": best_index,
@@ -251,7 +259,7 @@ class EnsembleRegressor:
         self.trained_models = {}
         self.scores = {}
         self.important_features = {}
-        self.feature_correlations = {}
+        # self.feature_correlations = {}
         self.nfolds = nfolds
         self.splitter = Splitter(n_splits=nfolds, shuffle=True)
         self.scoring = scoring
@@ -323,7 +331,8 @@ class EnsembleRegressor:
         self.important_features.update(outputs["features"])
         print("IIIIIIIIIIIII")
         print(outputs)
-        self.feature_correlations.update(outputs["feature_correlations"])
+        print("IIIIIIIIIIIII")
+        # self.feature_correlations.update(outputs["feature_correlations"])
         predictions = [
             {col: val[j] for col, val in outputs["predictions"].items()}
             for j in range(n)
@@ -373,7 +382,7 @@ class EnsembleRegressor:
                         row["feature%i_importance" % j] = self.important_features[gene][
                             i
                         ].iloc[j]
-                        row["feature%i_correlation" % j] = self.feature_correlations[gene][i].iloc[j]
+                        # row["feature%i_correlation" % j] = self.feature_correlations[gene][i].iloc[j]
                     except IndexError:
                         row["feature%i" % j] = np.nan
                         row["feature%i_importance" % j] = np.nan

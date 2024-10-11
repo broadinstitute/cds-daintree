@@ -16,7 +16,7 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def run_docker_command(cmd, max_retries=3, delay=5):
+def run_docker_command(cmd, max_retries=1, delay=5):
     for attempt in range(max_retries):
         try:
             subprocess.run(cmd, check=True)
