@@ -121,7 +121,7 @@ def gather_ensemble_tasks(
     partitions="partitions.csv",
     features_suffix="features.csv",
     predictions_suffix="predictions.csv",
-    top_n=50,
+    top_n=10,
 ):
 
     targets = pd.read_feather(save_pref / targets)
@@ -355,7 +355,7 @@ def _collect_and_fit(
         save_and_run_bash(validate_str, validate_dict)
         # gather the ensemble results and collect the top features
         df_ensemble, df_predictions = gather_ensemble_tasks(
-            save_pref, targets=str(save_pref / "target_matrix.ftr"), top_n=50
+            save_pref, targets=str(save_pref / "target_matrix.ftr"), top_n=10
         )
         df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
         if upload_to_taiga:

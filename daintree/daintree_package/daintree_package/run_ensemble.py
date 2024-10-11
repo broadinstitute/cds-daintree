@@ -216,7 +216,7 @@ def single_fit(
     best_index = np.argmax(np.mean(scores, axis=1))
     if not return_models:
         target_models = [np.nan for i in range(len(scores))]
-    print("HHHHHHHHHH")
+    print("HHHHHHHHHH Start Single Fit")
     print({
         "models": target_models,
         "best": best_index,
@@ -225,6 +225,7 @@ def single_fit(
         "predictions": prediction,
         "feature_correlations": feature_correlations,
     })
+    print("HHHHHHHHHH End Single Fit")
     return {
         "models": target_models,
         "best": best_index,
@@ -259,7 +260,7 @@ class EnsembleRegressor:
         self.trained_models = {}
         self.scores = {}
         self.important_features = {}
-        # self.feature_correlations = {}
+        self.feature_correlations = {}
         self.nfolds = nfolds
         self.splitter = Splitter(n_splits=nfolds, shuffle=True)
         self.scoring = scoring
@@ -298,6 +299,7 @@ class EnsembleRegressor:
             "scores": {},
             "features": {},
             "predictions": {},
+            "feature_correlations": {},
         }
         start_time = time()
         curr_time = start_time
@@ -329,10 +331,10 @@ class EnsembleRegressor:
         self.best_indices.update(outputs["best"])
         self.scores.update(outputs["scores"])
         self.important_features.update(outputs["features"])
-        print("IIIIIIIIIIIII")
+        print("IIIIIIIIIIIII Start Outputs")
         print(outputs)
-        print("IIIIIIIIIIIII")
-        # self.feature_correlations.update(outputs["feature_correlations"])
+        print("IIIIIIIIIIIII End Outputs")
+        self.feature_correlations.update(outputs["feature_correlations"])
         predictions = [
             {col: val[j] for col, val in outputs["predictions"].items()}
             for j in range(n)
@@ -382,7 +384,7 @@ class EnsembleRegressor:
                         row["feature%i_importance" % j] = self.important_features[gene][
                             i
                         ].iloc[j]
-                        # row["feature%i_correlation" % j] = self.feature_correlations[gene][i].iloc[j]
+                        row["feature%i_correlation" % j] = self.feature_correlations[gene][i].iloc[j]
                     except IndexError:
                         row["feature%i" % j] = np.nan
                         row["feature%i_importance" % j] = np.nan
