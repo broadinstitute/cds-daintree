@@ -185,9 +185,11 @@ def gather_ensemble_tasks(
     ensb_cols = ["gene", "model", "pearson", "best"]
 
     for i in range(top_n):
-        cols = ["feature" + str(i), "feature" + str(i) + "_importance"]
-        ensb_cols += cols
-
+        feature_importance_cols = ["feature" + str(i), "feature" + str(i) + "_importance"]
+        ensb_cols += feature_importance_cols
+        feature_correlations_cols = ["feature" + str(i) + "_correlation"]
+        ensb_cols += feature_correlations_cols
+        
     ensemble = ensemble.sort_values(["gene", "model"])[ensb_cols]
 
     return ensemble, predictions
