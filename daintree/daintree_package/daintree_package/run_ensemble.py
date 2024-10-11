@@ -163,7 +163,7 @@ def single_fit(
     scores = []
     features = []
     prediction = []
-    feature_correlations = {}
+    feature_correlations = []
 
     for model, x in zip(target_models, X):
         if x.isnull().any().any():
@@ -172,11 +172,12 @@ def single_fit(
                 % (model, x.isnull().sum(), x.isnull().sum(axis=1))
             )
         # Calculate Pearson correlation between each feature and the target `y`
+        correlation = []
         for feature in x.columns:
             # Compute Pearson correlation between feature `feature` and target `y`
             corr, _ = pearsonr(x[feature], y)
-            feature_correlations[feature] = corr
-        
+            correlation.append(corr)
+        feature_correlations.append(pd.Series(correlation, index=x.columns))
         if rounding:
             splits = splitter.split(y > 0.5, y > 0.5)
         else:
@@ -215,6 +216,7 @@ def single_fit(
     best_index = np.argmax(np.mean(scores, axis=1))
     if not return_models:
         target_models = [np.nan for i in range(len(scores))]
+    print("HHHHHHHHHH")
     return {
         "models": target_models,
         "best": best_index,
@@ -319,6 +321,8 @@ class EnsembleRegressor:
         self.best_indices.update(outputs["best"])
         self.scores.update(outputs["scores"])
         self.important_features.update(outputs["features"])
+        print("IIIIIIIIIIIII")
+        print(outputs)
         self.feature_correlations.update(outputs["feature_correlations"])
         predictions = [
             {col: val[j] for col, val in outputs["predictions"].items()}
