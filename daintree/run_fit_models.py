@@ -170,19 +170,19 @@ def gather_ensemble_tasks(
         cors = (
             pd.DataFrame(cors)
             .reset_index()
-            .rename(columns={"index": "gene", 0: "pearson"})
+            .rename(columns={"index": "target_variable", 0: "pearson"})
         )
         cors["model"] = model
 
         all_cors.append(cors)
 
     all_cors = pd.concat(all_cors, ignore_index=True)
-    ensemble = all_features.merge(all_cors, on=["gene", "model"])
+    ensemble = all_features.merge(all_cors, on=["target_variable", "model"])
 
-    # Get the highest correlation across models per "gene" (entity)
-    ensemble["best"] = ensemble.groupby("gene")["pearson"].rank(ascending=False) == 1
+    # Get the highest correlation across models per "target_variable" (entity)
+    ensemble["best"] = ensemble.groupby("target_variable")["pearson"].rank(ascending=False) == 1
 
-    ensb_cols = ["gene", "model", "pearson", "best"]
+    ensb_cols = ["target_variable", "model", "pearson", "best"]
 
     for i in range(top_n):
         feature_importance_cols = ["feature" + str(i), "feature" + str(i) + "_importance"]
@@ -190,7 +190,7 @@ def gather_ensemble_tasks(
         feature_correlations_cols = ["feature" + str(i) + "_correlation"]
         ensb_cols += feature_correlations_cols
         
-    ensemble = ensemble.sort_values(["gene", "model"])[ensb_cols]
+    ensemble = ensemble.sort_values(["target_variable", "model"])[ensb_cols]
 
     return ensemble, predictions
 

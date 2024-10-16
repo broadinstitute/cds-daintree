@@ -359,7 +359,7 @@ class EnsembleRegressor:
         )
 
     def format_results(self):
-        columns = ["gene", "model"]
+        columns = ["target_variable", "model"]
         for i in range(self.nfolds):
             columns.append("score%i" % i)
         columns.append("best")
@@ -368,22 +368,22 @@ class EnsembleRegressor:
         columns.extend(["feature%i_correlation" % i for i in range(50)])
 
         melted = pd.DataFrame(columns=columns)
-        for gene in self.trained_models.keys():
+        for target_variable in self.trained_models.keys():
             for i in range(len(self.model_types)):
                 row = {
-                    "gene": gene,
+                    "target_variable": target_variable,
                     "model": self.model_types[i]["Name"],
-                    "best": self.best_indices[gene] == i,
+                    "best": self.best_indices[target_variable] == i,
                 }
                 for j in range(self.nfolds):
-                    row["score%i" % j] = self.scores[gene][i][j]
+                    row["score%i" % j] = self.scores[target_variable][i][j]
                 for j in range(50):
                     try:
-                        row["feature%i" % j] = self.important_features[gene][i].index[j]
-                        row["feature%i_importance" % j] = self.important_features[gene][
+                        row["feature%i" % j] = self.important_features[target_variable][i].index[j]
+                        row["feature%i_importance" % j] = self.important_features[target_variable][
                             i
                         ].iloc[j]
-                        row["feature%i_correlation" % j] = self.feature_correlations[gene][i].iloc[j]
+                        row["feature%i_correlation" % j] = self.feature_correlations[target_variable][i].iloc[j]
                     except IndexError:
                         row["feature%i" % j] = np.nan
                         row["feature%i_importance" % j] = np.nan
