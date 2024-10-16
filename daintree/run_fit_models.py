@@ -20,8 +20,8 @@ from utils import (
 from taiga_utils import update_taiga
 
 
-ensemble_filename = "ensemble.csv"
-feature_metadata_filename = "feature_metadata.csv"
+# ensemble_filename = "ensemble.csv"
+# feature_metadata_filename = "feature_metadata.csv"
 
 @click.group()
 def cli():
@@ -258,6 +258,10 @@ def _collect_and_fit(
     print("#######################")
     feature_info_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_type"])
     model_name = ipt_dict["name"]
+
+    ensemble_filename = f"ensemble_{model_name}.csv"
+    feature_metadata_filename = f"feature_metadata_{model_name}.csv"
+
     if test:
         print("and truncating datasets for testing...")
     for dataset_name, dataset_metadata in ipt_dict["data"].items():
@@ -339,6 +343,7 @@ def _collect_and_fit(
 
     print("partitioning inputs...")
     partiton_inputs(df_dep, config_dict, save_pref, out_name="partitions.csv")
+
     if not skipfit:
         print("submitting fit jobs...")
 

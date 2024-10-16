@@ -174,7 +174,6 @@ def single_fit(
         # Calculate Pearson correlation between each feature and the target `y`
         correlation = []
         for feature in x.columns:
-            # Compute Pearson correlation between feature `feature` and target `y`
             corr, _ = pearsonr(x[feature], y)
             correlation.append(corr)
         feature_correlations.append(pd.Series(correlation, index=x.columns))
