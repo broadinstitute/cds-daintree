@@ -177,6 +177,8 @@ def single_fit(
             corr, _ = pearsonr(x[feature], y)
             correlation.append(corr)
         feature_correlations.append(pd.Series(correlation, index=x.columns))
+        print("FEATURE CORRELATIONS")
+        print(feature_correlations)
         if rounding:
             splits = splitter.split(y > 0.5, y > 0.5)
         else:
@@ -328,9 +330,9 @@ class EnsembleRegressor:
         self.best_indices.update(outputs["best"])
         self.scores.update(outputs["scores"])
         self.important_features.update(outputs["features"])
-        print("IIIIIIIIIIIII Start Outputs")
-        print(outputs)
-        print("IIIIIIIIIIIII End Outputs")
+        # print("IIIIIIIIIIIII Start Outputs")
+        # print(outputs)
+        # print("IIIIIIIIIIIII End Outputs")
         self.feature_correlations.update(outputs["feature_correlations"])
         predictions = [
             {col: val[j] for col, val in outputs["predictions"].items()}

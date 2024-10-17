@@ -148,9 +148,10 @@ def gather_ensemble_tasks(
     assert all(os.path.exists(f) for f in partitions["feature_path"])
     assert all(os.path.exists(f) for f in partitions["predictions_path"])
 
-    all_features = pd.DataFrame().append(
-        [pd.read_csv(f) for f in partitions["feature_path"]], ignore_index=True,
+    all_features = pd.concat(
+        [pd.read_csv(f) for f in partitions["feature_path"]], ignore_index=True
     )
+
     all_features.drop(["score0", "score1", "best"], axis=1, inplace=True)
 
     # Get pearson correlation of predictions by model
@@ -178,9 +179,15 @@ def gather_ensemble_tasks(
 
     all_cors = pd.concat(all_cors, ignore_index=True)
     ensemble = all_features.merge(all_cors, on=["target_variable", "model"])
+    
+    ### The following code is implemented this way due to a
+    # PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.
+    # De-fragment the DataFrame
+    ensemble = ensemble.copy()
 
     # Get the highest correlation across models per "target_variable" (entity)
-    ensemble["best"] = ensemble.groupby("target_variable")["pearson"].rank(ascending=False) == 1
+    ranked_pearson = ensemble.groupby("target_variable")["pearson"].rank(ascending=False)
+    ensemble["best"] = (ranked_pearson == 1)
 
     ensb_cols = ["target_variable", "model", "pearson", "best"]
 
@@ -257,10 +264,11 @@ def _collect_and_fit(
     print("generating feature info...")
     print("#######################")
     feature_info_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_type"])
-    model_name = ipt_dict["name"]
+    model_name = ipt_dict["model_name"]
+    screen_name = ipt_dict["screen_name"]
 
-    ensemble_filename = f"ensemble_{model_name}.csv"
-    feature_metadata_filename = f"feature_metadata_{model_name}.csv"
+    ensemble_filename = f"ensemble_{model_name}_{screen_name}.csv"
+    feature_metadata_filename = f"feature_metadata_{model_name}_{screen_name}.csv"
 
     if test:
         print("and truncating datasets for testing...")
