@@ -163,39 +163,13 @@ def single_fit(
     scores = []
     features = []
     prediction = []
-    feature_correlations = []
 
     for model, x in zip(target_models, X):
-        # # Drop constant columns from x (those that have a single unique value)
-        # first_row = x.iloc[0]
-        # # Compare each element of the DataFrame to the first row
-        # non_constant_check = x != first_row
-        # # Check if any element in each column is different from the first row
-        # non_constant_columns = non_constant_check.any()
-
-        # # Select only the columns that are not constant
-        # x = x.loc[:, non_constant_columns]
-
         if x.isnull().any().any():
             raise ValueError(
                 "Feature set for model %r contains nulls. Axial sums of nulls:\n%r\n\n%r"
                 % (model, x.isnull().sum(), x.isnull().sum(axis=1))
             )
-        
-        # # Calculate Pearson correlation between each feature and y
-        # correlation = []
-        # for feature in x.columns:
-        #     # Check if the feature is constant
-        #     if np.std(x[feature]) == 0:
-        #         print("ZERO VARIANCE")
-        #         # print(x[feature])
-        #         correlation.append(np.nan)
-        #     else:
-        #         corr, _ = pearsonr(x[feature], y)
-        #         correlation.append(corr)
-        # feature_correlations.append(pd.Series(correlation, index=x.columns))
-        # print("FEATURE CORRELATIONS")
-        # print(feature_correlations)
 
         if rounding:
             splits = splitter.split(y > 0.5, y > 0.5)
@@ -235,21 +209,12 @@ def single_fit(
     best_index = np.argmax(np.mean(scores, axis=1))
     if not return_models:
         target_models = [np.nan for i in range(len(scores))]
-    # print({
-    #     "models": target_models,
-    #     "best": best_index,
-    #     "scores": scores,
-    #     "features": features,
-    #     "predictions": prediction,
-    #     "feature_correlations": feature_correlations,
-    # })
     return {
         "models": target_models,
         "best": best_index,
         "scores": scores,
         "features": features,
         "predictions": prediction,
-        # "feature_correlations": feature_correlations,
     }
 
 
@@ -277,7 +242,6 @@ class EnsembleRegressor:
         self.trained_models = {}
         self.scores = {}
         self.important_features = {}
-        # self.feature_correlations = {}
         self.nfolds = nfolds
         self.splitter = Splitter(n_splits=nfolds, shuffle=True)
         self.scoring = scoring
@@ -316,7 +280,6 @@ class EnsembleRegressor:
             "scores": {},
             "features": {},
             "predictions": {},
-            # "feature_correlations": {},
         }
         start_time = time()
         curr_time = start_time
@@ -348,10 +311,6 @@ class EnsembleRegressor:
         self.best_indices.update(outputs["best"])
         self.scores.update(outputs["scores"])
         self.important_features.update(outputs["features"])
-        # print("IIIIIIIIIIIII Start Outputs")
-        # print(outputs)
-        # print("IIIIIIIIIIIII End Outputs")
-        # self.feature_correlations.update(outputs["feature_correlations"])
         predictions = [
             {col: val[j] for col, val in outputs["predictions"].items()}
             for j in range(n)
@@ -401,11 +360,9 @@ class EnsembleRegressor:
                         row["feature%i_importance" % j] = self.important_features[target_variable][
                             i
                         ].iloc[j]
-                        # row["feature%i_correlation" % j] = self.feature_correlations[target_variable][i].iloc[j]
                     except IndexError:
                         row["feature%i" % j] = np.nan
                         row["feature%i_importance" % j] = np.nan
-                        # row["feature%i_correlation" % j] = np.nan
                 melted = pd.concat([melted, pd.DataFrame([row])], ignore_index=True)
         print("Finished formatting results")
         return melted
