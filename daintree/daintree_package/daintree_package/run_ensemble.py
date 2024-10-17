@@ -171,7 +171,7 @@ def single_fit(
                 "Feature set for model %r contains nulls. Axial sums of nulls:\n%r\n\n%r"
                 % (model, x.isnull().sum(), x.isnull().sum(axis=1))
             )
-        # Calculate Pearson correlation between each feature and the target `y`
+        # Calculate Pearson correlation between each feature and y
         # correlation = []
         # for feature in x.columns:
         #     corr, _ = pearsonr(x[feature], y)
@@ -183,8 +183,9 @@ def single_fit(
             if np.std(x[feature]) == 0:
                 print("ZERO VARIANCE")
                 print(x[feature])
-                # Append NaN for constant features, since correlation is undefined
-                correlation.append(np.nan)
+                # correlation.append(np.nan)
+                # Append the string "NA"
+                correlation.append("NA")
             else:
                 corr, _ = pearsonr(x[feature], y)
                 correlation.append(corr)
