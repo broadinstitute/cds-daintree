@@ -166,6 +166,16 @@ def single_fit(
     feature_correlations = []
 
     for model, x in zip(target_models, X):
+        # Drop constant columns from x (those that have a single unique value)
+        first_row = x.iloc[0]
+        # Compare each element of the DataFrame to the first row
+        non_constant_check = x != first_row
+        # Check if any element in each column is different from the first row
+        non_constant_columns = non_constant_check.any()
+
+        # Select only the columns that are not constant
+        x = x.loc[:, non_constant_columns]
+        
         if x.isnull().any().any():
             raise ValueError(
                 "Feature set for model %r contains nulls. Axial sums of nulls:\n%r\n\n%r"
