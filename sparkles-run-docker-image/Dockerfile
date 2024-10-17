@@ -13,7 +13,7 @@ RUN apt-get -y install software-properties-common littler pip openssh-client rsy
 RUN mkdir -p -m 0600 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 RUN /install/depmap-py/bin/pip install scikit-learn click
-RUN echo "Test 5"
+RUN echo "Test 6"
 RUN /install/depmap-py/bin/pip install git+https://github.com/broadinstitute/cds-daintree.git@pearson-correlation#subdirectory=daintree/daintree_package
 
 # Download and Install Google Cloud SDK
