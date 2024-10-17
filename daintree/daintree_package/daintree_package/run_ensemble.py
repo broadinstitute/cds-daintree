@@ -182,18 +182,18 @@ def single_fit(
                 % (model, x.isnull().sum(), x.isnull().sum(axis=1))
             )
         
-        # Calculate Pearson correlation between each feature and y
-        correlation = []
-        for feature in x.columns:
-            # Check if the feature is constant
-            if np.std(x[feature]) == 0:
-                print("ZERO VARIANCE")
-                # print(x[feature])
-                correlation.append(np.nan)
-            else:
-                corr, _ = pearsonr(x[feature], y)
-                correlation.append(corr)
-        feature_correlations.append(pd.Series(correlation, index=x.columns))
+        # # Calculate Pearson correlation between each feature and y
+        # correlation = []
+        # for feature in x.columns:
+        #     # Check if the feature is constant
+        #     if np.std(x[feature]) == 0:
+        #         print("ZERO VARIANCE")
+        #         # print(x[feature])
+        #         correlation.append(np.nan)
+        #     else:
+        #         corr, _ = pearsonr(x[feature], y)
+        #         correlation.append(corr)
+        # feature_correlations.append(pd.Series(correlation, index=x.columns))
         # print("FEATURE CORRELATIONS")
         # print(feature_correlations)
 
@@ -249,7 +249,7 @@ def single_fit(
         "scores": scores,
         "features": features,
         "predictions": prediction,
-        "feature_correlations": feature_correlations,
+        # "feature_correlations": feature_correlations,
     }
 
 
@@ -277,7 +277,7 @@ class EnsembleRegressor:
         self.trained_models = {}
         self.scores = {}
         self.important_features = {}
-        self.feature_correlations = {}
+        # self.feature_correlations = {}
         self.nfolds = nfolds
         self.splitter = Splitter(n_splits=nfolds, shuffle=True)
         self.scoring = scoring
@@ -316,7 +316,7 @@ class EnsembleRegressor:
             "scores": {},
             "features": {},
             "predictions": {},
-            "feature_correlations": {},
+            # "feature_correlations": {},
         }
         start_time = time()
         curr_time = start_time
@@ -351,7 +351,7 @@ class EnsembleRegressor:
         # print("IIIIIIIIIIIII Start Outputs")
         # print(outputs)
         # print("IIIIIIIIIIIII End Outputs")
-        self.feature_correlations.update(outputs["feature_correlations"])
+        # self.feature_correlations.update(outputs["feature_correlations"])
         predictions = [
             {col: val[j] for col, val in outputs["predictions"].items()}
             for j in range(n)
@@ -401,11 +401,11 @@ class EnsembleRegressor:
                         row["feature%i_importance" % j] = self.important_features[target_variable][
                             i
                         ].iloc[j]
-                        row["feature%i_correlation" % j] = self.feature_correlations[target_variable][i].iloc[j]
+                        # row["feature%i_correlation" % j] = self.feature_correlations[target_variable][i].iloc[j]
                     except IndexError:
                         row["feature%i" % j] = np.nan
                         row["feature%i_importance" % j] = np.nan
-                        row["feature%i_correlation" % j] = np.nan
+                        # row["feature%i_correlation" % j] = np.nan
                 melted = pd.concat([melted, pd.DataFrame([row])], ignore_index=True)
         print("Finished formatting results")
         return melted
