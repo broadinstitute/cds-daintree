@@ -172,13 +172,24 @@ def single_fit(
                 % (model, x.isnull().sum(), x.isnull().sum(axis=1))
             )
         # Calculate Pearson correlation between each feature and the target `y`
+        # correlation = []
+        # for feature in x.columns:
+        #     corr, _ = pearsonr(x[feature], y)
+        #     correlation.append(corr)
+        # feature_correlations.append(pd.Series(correlation, index=x.columns))
         correlation = []
         for feature in x.columns:
-            corr, _ = pearsonr(x[feature], y)
-            correlation.append(corr)
+            # Check if the feature is constant (variance == 0)
+            if np.std(x[feature]) == 0:
+                # Append NaN for constant features, since correlation is undefined
+                correlation.append(np.nan)
+            else:
+                corr, _ = pearsonr(x[feature], y)
+                correlation.append(corr)
         feature_correlations.append(pd.Series(correlation, index=x.columns))
         print("FEATURE CORRELATIONS")
         print(feature_correlations)
+
         if rounding:
             splits = splitter.split(y > 0.5, y > 0.5)
         else:
