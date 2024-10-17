@@ -166,36 +166,30 @@ def single_fit(
     feature_correlations = []
 
     for model, x in zip(target_models, X):
-        # Drop constant columns from x (those that have a single unique value)
-        first_row = x.iloc[0]
-        # Compare each element of the DataFrame to the first row
-        non_constant_check = x != first_row
-        # Check if any element in each column is different from the first row
-        non_constant_columns = non_constant_check.any()
+        # # Drop constant columns from x (those that have a single unique value)
+        # first_row = x.iloc[0]
+        # # Compare each element of the DataFrame to the first row
+        # non_constant_check = x != first_row
+        # # Check if any element in each column is different from the first row
+        # non_constant_columns = non_constant_check.any()
 
-        # Select only the columns that are not constant
-        x = x.loc[:, non_constant_columns]
-        
+        # # Select only the columns that are not constant
+        # x = x.loc[:, non_constant_columns]
+
         if x.isnull().any().any():
             raise ValueError(
                 "Feature set for model %r contains nulls. Axial sums of nulls:\n%r\n\n%r"
                 % (model, x.isnull().sum(), x.isnull().sum(axis=1))
             )
+        
         # Calculate Pearson correlation between each feature and y
-        # correlation = []
-        # for feature in x.columns:
-        #     corr, _ = pearsonr(x[feature], y)
-        #     correlation.append(corr)
-        # feature_correlations.append(pd.Series(correlation, index=x.columns))
         correlation = []
         for feature in x.columns:
-            # Check if the feature is constant (variance == 0)
+            # Check if the feature is constant
             if np.std(x[feature]) == 0:
                 print("ZERO VARIANCE")
-                print(x[feature])
-                # correlation.append(np.nan)
-                # Append the string "NA"
-                correlation.append("NA")
+                # print(x[feature])
+                correlation.append(np.nan)
             else:
                 corr, _ = pearsonr(x[feature], y)
                 correlation.append(corr)
