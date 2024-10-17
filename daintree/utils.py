@@ -50,7 +50,7 @@ def process_biomarker_matrix(df, index_col=0, test=False):
         df = df.iloc[:, :]
     print(df.head())
     print("End Processing Biomarker Matrix")
-    df.to_csv("features.csv", index=False)
+    # df.to_csv("features.csv", index=False)
     return df
 
 
@@ -84,7 +84,7 @@ def process_dep_matrix(df, test=False, restrict_targets=False, restrict_to=None)
     print("Start Processing Dependency Matrix")
     print(df)
     print("End Processing Dependency Matrix")
-    df.to_csv("deps.csv", index=False)
+    # df.to_csv("deps.csv", index=False)
     return df
 
 

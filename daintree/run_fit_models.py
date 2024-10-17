@@ -37,7 +37,7 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.extend(["--config", sparkles_config])
     cmd.append("sub")
     cmd.extend(
-        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v4"]
+        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v5"]
     )
     cmd.extend(["-u", "/daintree/daintree_package/daintree_package/main.py"])
     cmd.extend(["-u", str(save_pref / "target_matrix.ftr") + ":target.ftr"])

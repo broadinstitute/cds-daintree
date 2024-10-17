@@ -215,16 +215,14 @@ def single_fit(
     best_index = np.argmax(np.mean(scores, axis=1))
     if not return_models:
         target_models = [np.nan for i in range(len(scores))]
-    print("HHHHHHHHHH Start Single Fit")
-    print({
-        "models": target_models,
-        "best": best_index,
-        "scores": scores,
-        "features": features,
-        "predictions": prediction,
-        "feature_correlations": feature_correlations,
-    })
-    print("HHHHHHHHHH End Single Fit")
+    # print({
+    #     "models": target_models,
+    #     "best": best_index,
+    #     "scores": scores,
+    #     "features": features,
+    #     "predictions": prediction,
+    #     "feature_correlations": feature_correlations,
+    # })
     return {
         "models": target_models,
         "best": best_index,
