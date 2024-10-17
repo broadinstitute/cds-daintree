@@ -181,14 +181,16 @@ def single_fit(
         for feature in x.columns:
             # Check if the feature is constant (variance == 0)
             if np.std(x[feature]) == 0:
+                print("ZERO VARIANCE")
+                print(x[feature])
                 # Append NaN for constant features, since correlation is undefined
                 correlation.append(np.nan)
             else:
                 corr, _ = pearsonr(x[feature], y)
                 correlation.append(corr)
         feature_correlations.append(pd.Series(correlation, index=x.columns))
-        print("FEATURE CORRELATIONS")
-        print(feature_correlations)
+        # print("FEATURE CORRELATIONS")
+        # print(feature_correlations)
 
         if rounding:
             splits = splitter.split(y > 0.5, y > 0.5)
@@ -401,7 +403,6 @@ class EnsembleRegressor:
                         row["feature%i_correlation" % j] = np.nan
                 melted = pd.concat([melted, pd.DataFrame([row])], ignore_index=True)
         print("Finished formatting results")
-        print(melted)
         return melted
 
     def save_results(self, feat_outfile, pred_outfile):
