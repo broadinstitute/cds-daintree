@@ -17,11 +17,9 @@ from utils import (
     process_biomarker_matrix,
     process_column_name,
 )
+from scipy.stats import pearsonr
 from taiga_utils import update_taiga
 
-
-# ensemble_filename = "ensemble.csv"
-# feature_metadata_filename = "feature_metadata.csv"
 
 @click.group()
 def cli():
@@ -37,7 +35,7 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.extend(["--config", sparkles_config])
     cmd.append("sub")
     cmd.extend(
-        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v5"]
+        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v6"]
     )
     cmd.extend(["-u", "/daintree/daintree_package/daintree_package/main.py"])
     cmd.extend(["-u", str(save_pref / "target_matrix.ftr") + ":target.ftr"])
@@ -116,6 +114,7 @@ def save_and_run_bash(cmd_template, sub_dict):
 
 def gather_ensemble_tasks(
     save_pref,
+    features="X.ftr",
     targets="target_matrix.ftr",
     data_dir="data",
     partitions="partitions.csv",
@@ -123,7 +122,7 @@ def gather_ensemble_tasks(
     predictions_suffix="predictions.csv",
     top_n=50,
 ):
-
+    features = pd.read_feather(save_pref / features)
     targets = pd.read_feather(save_pref / targets)
     targets = targets.set_index("Row.name")
 
@@ -190,6 +189,32 @@ def gather_ensemble_tasks(
     ensemble["best"] = (ranked_pearson == 1)
 
     ensb_cols = ["target_variable", "model", "pearson", "best"]
+
+    # Iterate over each row in the ensemble
+    for index, row in ensemble.iterrows():
+        # Get the target variable name from the ensemble
+        target_variable = row['target_variable']
+        
+        # Extract the corresponding target data from `targets` DataFrame
+        y = targets[target_variable]
+
+        # Iterate over feature columns in the ensemble
+        for i in range(top_n):  # Assuming there are 50 features (feature0 to feature49)
+            feature_col = f'feature{i}'
+            feature_name = row[feature_col]  # Get the feature name listed in the ensemble row
+            
+            if feature_name in features.columns:
+                # Extract feature data from the features DataFrame
+                x = features[feature_name]
+                
+                # Compute Pearson correlation, handling constant columns
+                if x.std() == 0 or y.std() == 0:
+                    corr = None  # Assign None or NaN if feature or target is constant
+                else:
+                    corr, _ = pearsonr(x, y)
+                
+                # Add correlation as a new column to the ensemble
+                ensemble.loc[index, f'{feature_col}_correlation'] = corr
 
     for i in range(top_n):
         feature_importance_cols = ["feature" + str(i), "feature" + str(i) + "_importance"]
@@ -370,7 +395,7 @@ def _collect_and_fit(
         save_and_run_bash(validate_str, validate_dict)
         # gather the ensemble results and collect the top features
         df_ensemble, df_predictions = gather_ensemble_tasks(
-            save_pref, targets=str(save_pref / "target_matrix.ftr"), top_n=50
+            save_pref, features=str(save_pref / "X.ftr"), targets=str(save_pref / "target_matrix.ftr"), top_n=50
         )
         df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
         if upload_to_taiga:
