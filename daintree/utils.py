@@ -50,7 +50,7 @@ def process_biomarker_matrix(df, index_col=0, test=False):
         df = df.iloc[:, :]
     print(df.head())
     print("End Processing Biomarker Matrix")
-    df.to_csv("features.csv", index=False)
+    # df.to_csv("features.csv", index=False)
     return df
 
 
@@ -84,7 +84,7 @@ def process_dep_matrix(df, test=False, restrict_targets=False, restrict_to=None)
     print("Start Processing Dependency Matrix")
     print(df)
     print("End Processing Dependency Matrix")
-    df.to_csv("deps.csv", index=False)
+    # df.to_csv("deps.csv", index=False)
     return df
 
 
@@ -115,7 +115,7 @@ def partiton_inputs(dep_matrix, ensemble_config, save_pref, out_name="partitions
 
 
 def generate_config(input_dict, relation="All"):
-    name = input_dict["name"]
+    model_name = input_dict["model_name"]
     data = input_dict["data"]
 
     features = [
@@ -152,7 +152,7 @@ def generate_config(input_dict, relation="All"):
     if exempt:
         model_config["Exempt"] = exempt
 
-    return {name: model_config}
+    return {model_name: model_config}
 
 
 def generate_feature_info(ipt_dicts, save_pref):

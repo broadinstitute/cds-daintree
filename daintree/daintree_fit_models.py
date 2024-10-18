@@ -16,7 +16,7 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def run_docker_command(cmd, max_retries=3, delay=5):
+def run_docker_command(cmd, max_retries=1, delay=5):
     for attempt in range(max_retries):
         try:
             subprocess.run(cmd, check=True)
@@ -39,7 +39,7 @@ def main():
     parser.add_argument("--out", required=True, help="Output directory")
     
     # Optional arguments
-    parser.add_argument("--image", default="us.gcr.io/broad-achilles/daintree-sparkles:v4", help="Docker image name")
+    parser.add_argument("--image", default="us.gcr.io/broad-achilles/daintree-sparkles:v6", help="Docker image name")
     parser.add_argument("--taiga-dir", default="~/.taiga", help="Path to Taiga token and cache")
     parser.add_argument("--sparkles-cache", default="~/.sparkles-cache", help="Path to Sparkles cache")
     parser.add_argument("--sparkles-path", default="/install/sparkles/bin/sparkles", help="Path to Sparkles executable")

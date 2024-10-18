@@ -141,7 +141,7 @@ def single_fit(
     model_types,
     splitter,
     scoring,
-    nfeatures=10,
+    nfeatures=50,
     rounding=False,
     return_models=False,
 ):
@@ -163,7 +163,6 @@ def single_fit(
     scores = []
     features = []
     prediction = []
-    feature_correlations = []
 
     for model, x in zip(target_models, X):
         if x.isnull().any().any():
@@ -171,13 +170,7 @@ def single_fit(
                 "Feature set for model %r contains nulls. Axial sums of nulls:\n%r\n\n%r"
                 % (model, x.isnull().sum(), x.isnull().sum(axis=1))
             )
-        # Calculate Pearson correlation between each feature and the target `y`
-        correlation = []
-        for feature in x.columns:
-            # Compute Pearson correlation between feature `feature` and target `y`
-            corr, _ = pearsonr(x[feature], y)
-            correlation.append(corr)
-        feature_correlations.append(pd.Series(correlation, index=x.columns))
+
         if rounding:
             splits = splitter.split(y > 0.5, y > 0.5)
         else:
@@ -216,14 +209,12 @@ def single_fit(
     best_index = np.argmax(np.mean(scores, axis=1))
     if not return_models:
         target_models = [np.nan for i in range(len(scores))]
-    print("HHHHHHHHHH")
     return {
         "models": target_models,
         "best": best_index,
         "scores": scores,
         "features": features,
         "predictions": prediction,
-        "feature_correlations": feature_correlations,
     }
 
 
@@ -251,7 +242,6 @@ class EnsembleRegressor:
         self.trained_models = {}
         self.scores = {}
         self.important_features = {}
-        self.feature_correlations = {}
         self.nfolds = nfolds
         self.splitter = Splitter(n_splits=nfolds, shuffle=True)
         self.scoring = scoring
@@ -321,9 +311,6 @@ class EnsembleRegressor:
         self.best_indices.update(outputs["best"])
         self.scores.update(outputs["scores"])
         self.important_features.update(outputs["features"])
-        print("IIIIIIIIIIIII")
-        print(outputs)
-        self.feature_correlations.update(outputs["feature_correlations"])
         predictions = [
             {col: val[j] for col, val in outputs["predictions"].items()}
             for j in range(n)
@@ -349,38 +336,35 @@ class EnsembleRegressor:
         )
 
     def format_results(self):
-        columns = ["gene", "model"]
+        columns = ["target_variable", "model"]
         for i in range(self.nfolds):
             columns.append("score%i" % i)
         columns.append("best")
-        for i in range(10):
+        for i in range(50):
             columns.extend(["feature%i" % i, "feature%i_importance" % i])
-        columns.extend(["feature%i_correlation" % i for i in range(10)])
+        columns.extend(["feature%i_correlation" % i for i in range(50)])
 
         melted = pd.DataFrame(columns=columns)
-        for gene in self.trained_models.keys():
+        for target_variable in self.trained_models.keys():
             for i in range(len(self.model_types)):
                 row = {
-                    "gene": gene,
+                    "target_variable": target_variable,
                     "model": self.model_types[i]["Name"],
-                    "best": self.best_indices[gene] == i,
+                    "best": self.best_indices[target_variable] == i,
                 }
                 for j in range(self.nfolds):
-                    row["score%i" % j] = self.scores[gene][i][j]
-                for j in range(10):
+                    row["score%i" % j] = self.scores[target_variable][i][j]
+                for j in range(50):
                     try:
-                        row["feature%i" % j] = self.important_features[gene][i].index[j]
-                        row["feature%i_importance" % j] = self.important_features[gene][
+                        row["feature%i" % j] = self.important_features[target_variable][i].index[j]
+                        row["feature%i_importance" % j] = self.important_features[target_variable][
                             i
                         ].iloc[j]
-                        row["feature%i_correlation" % j] = self.feature_correlations[gene][i].iloc[j]
                     except IndexError:
                         row["feature%i" % j] = np.nan
                         row["feature%i_importance" % j] = np.nan
-                        row["feature%i_correlation" % j] = np.nan
                 melted = pd.concat([melted, pd.DataFrame([row])], ignore_index=True)
         print("Finished formatting results")
-        print(melted)
         return melted
 
     def save_results(self, feat_outfile, pred_outfile):

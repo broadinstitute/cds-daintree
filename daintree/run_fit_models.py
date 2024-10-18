@@ -17,11 +17,9 @@ from utils import (
     process_biomarker_matrix,
     process_column_name,
 )
+from scipy.stats import pearsonr
 from taiga_utils import update_taiga
 
-
-ensemble_filename = "ensemble.csv"
-feature_metadata_filename = "feature_metadata.csv"
 
 @click.group()
 def cli():
@@ -37,7 +35,7 @@ def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, sav
     cmd.extend(["--config", sparkles_config])
     cmd.append("sub")
     cmd.extend(
-        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v4"]
+        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v6"]
     )
     cmd.extend(["-u", "/daintree/daintree_package/daintree_package/main.py"])
     cmd.extend(["-u", str(save_pref / "target_matrix.ftr") + ":target.ftr"])
@@ -116,6 +114,7 @@ def save_and_run_bash(cmd_template, sub_dict):
 
 def gather_ensemble_tasks(
     save_pref,
+    features="X.ftr",
     targets="target_matrix.ftr",
     data_dir="data",
     partitions="partitions.csv",
@@ -123,7 +122,7 @@ def gather_ensemble_tasks(
     predictions_suffix="predictions.csv",
     top_n=50,
 ):
-
+    features = pd.read_feather(save_pref / features)
     targets = pd.read_feather(save_pref / targets)
     targets = targets.set_index("Row.name")
 
@@ -148,9 +147,10 @@ def gather_ensemble_tasks(
     assert all(os.path.exists(f) for f in partitions["feature_path"])
     assert all(os.path.exists(f) for f in partitions["predictions_path"])
 
-    all_features = pd.DataFrame().append(
-        [pd.read_csv(f) for f in partitions["feature_path"]], ignore_index=True,
+    all_features = pd.concat(
+        [pd.read_csv(f) for f in partitions["feature_path"]], ignore_index=True
     )
+
     all_features.drop(["score0", "score1", "best"], axis=1, inplace=True)
 
     # Get pearson correlation of predictions by model
@@ -170,25 +170,59 @@ def gather_ensemble_tasks(
         cors = (
             pd.DataFrame(cors)
             .reset_index()
-            .rename(columns={"index": "gene", 0: "pearson"})
+            .rename(columns={"index": "target_variable", 0: "pearson"})
         )
         cors["model"] = model
 
         all_cors.append(cors)
 
     all_cors = pd.concat(all_cors, ignore_index=True)
-    ensemble = all_features.merge(all_cors, on=["gene", "model"])
+    ensemble = all_features.merge(all_cors, on=["target_variable", "model"])
+    
+    ### The following code is implemented this way due to a
+    # PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.
+    # De-fragment the DataFrame
+    ensemble = ensemble.copy()
 
-    # Get the highest correlation across models per "gene" (entity)
-    ensemble["best"] = ensemble.groupby("gene")["pearson"].rank(ascending=False) == 1
+    # Get the highest correlation across models per "target_variable" (entity)
+    ranked_pearson = ensemble.groupby("target_variable")["pearson"].rank(ascending=False)
+    ensemble["best"] = (ranked_pearson == 1)
 
-    ensb_cols = ["gene", "model", "pearson", "best"]
+    ensb_cols = ["target_variable", "model", "pearson", "best"]
+
+    # Iterate over each row in the ensemble
+    for index, row in ensemble.iterrows():
+        # Get the target variable name from the ensemble
+        target_variable = row['target_variable']
+        
+        # Extract the corresponding target data from `targets` DataFrame
+        y = targets[target_variable]
+
+        # Iterate over feature columns in the ensemble
+        for i in range(top_n):  # Assuming there are 50 features (feature0 to feature49)
+            feature_col = f'feature{i}'
+            feature_name = row[feature_col]  # Get the feature name listed in the ensemble row
+            
+            if feature_name in features.columns:
+                # Extract feature data from the features DataFrame
+                x = features[feature_name]
+                
+                # Compute Pearson correlation, handling constant columns
+                if x.std() == 0 or y.std() == 0:
+                    corr = None  # Assign None or NaN if feature or target is constant
+                else:
+                    corr, _ = pearsonr(x, y)
+                
+                # Add correlation as a new column to the ensemble
+                ensemble.loc[index, f'{feature_col}_correlation'] = corr
 
     for i in range(top_n):
-        cols = ["feature" + str(i), "feature" + str(i) + "_importance"]
-        ensb_cols += cols
-
-    ensemble = ensemble.sort_values(["gene", "model"])[ensb_cols]
+        feature_importance_cols = ["feature" + str(i), "feature" + str(i) + "_importance"]
+        ensb_cols += feature_importance_cols
+        feature_correlations_cols = ["feature" + str(i) + "_correlation"]
+        ensb_cols += feature_correlations_cols
+        
+    ensemble = ensemble.sort_values(["target_variable", "model"])[ensb_cols]
 
     return ensemble, predictions
 
@@ -255,7 +289,12 @@ def _collect_and_fit(
     print("generating feature info...")
     print("#######################")
     feature_info_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_type"])
-    model_name = ipt_dict["name"]
+    model_name = ipt_dict["model_name"]
+    screen_name = ipt_dict["screen_name"]
+
+    ensemble_filename = f"ensemble_{model_name}_{screen_name}.csv"
+    feature_metadata_filename = f"feature_metadata_{model_name}_{screen_name}.csv"
+
     if test:
         print("and truncating datasets for testing...")
     for dataset_name, dataset_metadata in ipt_dict["data"].items():
@@ -337,6 +376,7 @@ def _collect_and_fit(
 
     print("partitioning inputs...")
     partiton_inputs(df_dep, config_dict, save_pref, out_name="partitions.csv")
+
     if not skipfit:
         print("submitting fit jobs...")
 
@@ -355,7 +395,7 @@ def _collect_and_fit(
         save_and_run_bash(validate_str, validate_dict)
         # gather the ensemble results and collect the top features
         df_ensemble, df_predictions = gather_ensemble_tasks(
-            save_pref, targets=str(save_pref / "target_matrix.ftr"), top_n=50
+            save_pref, features=str(save_pref / "X.ftr"), targets=str(save_pref / "target_matrix.ftr"), top_n=50
         )
         df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
         if upload_to_taiga:
