@@ -342,7 +342,6 @@ class EnsembleRegressor:
         columns.append("best")
         for i in range(50):
             columns.extend(["feature%i" % i, "feature%i_importance" % i])
-        columns.extend(["feature%i_correlation" % i for i in range(50)])
 
         melted = pd.DataFrame(columns=columns)
         for target_variable in self.trained_models.keys():
