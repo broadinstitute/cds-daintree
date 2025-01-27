@@ -16,6 +16,7 @@ from utils import (
     process_dep_matrix,
     process_biomarker_matrix,
     process_column_name,
+    create_output_config
 )
 from scipy.stats import pearsonr
 from taiga_utils import update_taiga
@@ -35,7 +36,7 @@ def fit_with_sparkles(config_fname, related, sparkles_config, save_pref):
     cmd.extend(["--config", sparkles_config])
     cmd.append("sub")
     cmd.extend(
-        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v6"]
+        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v4"]
     )
     cmd.extend(["-u", "/daintree/daintree_package/daintree_package/main.py"])
     cmd.extend(["-u", str(save_pref / "target_matrix.ftr") + ":target.ftr"])
@@ -295,8 +296,8 @@ def _collect_and_fit(
     model_name = ipt_dict["model_name"]
     screen_name = ipt_dict["screen_name"]
 
-    ensemble_filename = f"ensemble_{model_name}_{screen_name}.csv"
-    feature_metadata_filename = f"feature_metadata_{model_name}_{screen_name}.csv"
+    ensemble_filename = f"Ensemble{model_name}{screen_name}.csv"
+    feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
 
     if test:
         print("and truncating datasets for testing...")
@@ -336,16 +337,9 @@ def _collect_and_fit(
     df_dep = process_dep_matrix(df_dep, test, restrict_targets, restrict_to)
     df_dep.to_feather(save_pref / "target_matrix.ftr")
 
-    # generate feature info file
+    # generate feature metadata file
     feature_info.to_csv(save_pref / "feature_info.csv")
     feature_info_df.to_csv(save_pref / feature_metadata_filename)
-    if upload_to_taiga:
-        update_taiga(
-            feature_info_df,
-            "Feature Metadata",
-            upload_to_taiga,
-            "FeatureMetadata",
-        )
 
     print('running "prepare_y"...')
     subprocess.check_call(
@@ -401,13 +395,57 @@ def _collect_and_fit(
             save_pref, features=str(save_pref / "X.ftr"), targets=str(save_pref / "target_matrix.ftr"), top_n=50
         )
         df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
+        predictions_filename = f"Predictions{model_name}{screen_name}.csv"
+        df_predictions.to_csv(save_pref / predictions_filename)
+
         if upload_to_taiga:
-            update_taiga(
-                df_ensemble,
-                "Y Matrix",
+            feature_metadata_taiga_info = update_taiga(
                 upload_to_taiga,
-                "PredictabilityYMatrix",
+                f"Updated Feature Metadata for Model: {model_name} and Screen: {screen_name}",
+                f"FeatureMetadata{model_name}{screen_name}",
+                save_pref / feature_metadata_filename,
+                "csv_table",
             )
+            print(f"Feature Metadata uploaded to Taiga: {feature_metadata_taiga_info}")
+
+            ensemble_taiga_info = update_taiga(
+                upload_to_taiga,
+                f"Updated Ensemble for Model: {model_name} and Screen: {screen_name}",
+                f"Ensemble{model_name}{screen_name}",
+                save_pref / ensemble_filename,
+                "csv_table",
+            )
+            print(f"Ensemble uploaded to Taiga: {ensemble_taiga_info}")
+
+            predictions_taiga_info = update_taiga(
+                upload_to_taiga,
+                f"Updated Predictions for Model: {model_name} and Screen: {screen_name}",
+                f"Predictions{model_name}{screen_name}",
+                save_pref / predictions_filename,
+                "csv_table",
+            )
+            print(f"Predictions uploaded to Taiga: {predictions_taiga_info}")
+            
+            # Create and write to output config file
+            output_config = create_output_config(
+                model_name=ipt_dict["model_name"],
+                screen_name=ipt_dict["screen_name"],
+                input_config=ipt_dict,
+                feature_metadata_id=feature_metadata_taiga_info,
+                ensemble_id=ensemble_taiga_info,
+                prediction_matrix_id=predictions_taiga_info
+            )
+
+            # Create output_config_files directory if it doesn't exist
+            output_config_dir = save_pref / "output_config_files"
+            output_config_dir.mkdir(parents=True, exist_ok=True)
+
+            output_config_filename = f"OutputConfig{model_name}{screen_name}.json"
+            output_config_file = output_config_dir / output_config_filename
+
+            with open(output_config_file, 'w') as f:
+                json.dump(output_config, f, indent=4)
+            print(f"Created output config file: {output_config_file}")
     else:
         print("skipping fitting and ending run")
 
@@ -428,13 +466,13 @@ def _collect_and_fit(
 )
 @click.option(
     "--test",
-    default=True,
+    default=False,
     type=bool,
     help="Run a test version, using only five gene dependencies and five features from each dataset",
 )
 @click.option(
     "--skipfit",
-    default=True,
+    default=False,
     type=bool,
     help="Do not execute the fitting, only prepare files. Used for testing",
 )
@@ -510,12 +548,12 @@ def collect_and_fit_generate_config(
 )
 @click.option(
     "--test",
-    is_flag=True,
+    is_flag=False,
     help="Run a test version, using only five gene dependencies and five features from each dataset",
 )
 @click.option(
     "--skipfit",
-    is_flag=True,
+    is_flag=False,
     help="Do not execute the fitting, only prepare files. Used for testing",
 )
 @click.option(

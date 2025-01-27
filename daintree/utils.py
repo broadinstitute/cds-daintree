@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import re
-
 from config import TEST_GENE_LIMIT, filter_columns
 
 
@@ -165,3 +164,33 @@ def generate_feature_info(ipt_dicts, save_pref):
     df = pd.DataFrame({"dataset": dsets, "filename": fnames,})
 
     return df
+
+
+
+
+def create_output_config(model_name, screen_name, input_config, feature_metadata_id, ensemble_id, prediction_matrix_id):
+    """
+    Creates an output configuration JSON file.
+    Args:
+        model_name (str): Name of the model (e.g., "CellContext")
+        screen_name (str): Name of the screen (e.g., "CRISPR")
+        input_config (dict): The input configuration from model-map.json
+        feature_metadata_id (str): Taiga ID for feature metadata
+        ensemble_id (str): Taiga ID for ensemble
+        prediction_matrix_id (str): Taiga ID for prediction matrix
+    """
+    config = {
+        model_name: {
+            "input": {
+                "name": model_name,
+                "data": input_config["data"]
+            },
+            "output": {
+                "ensemble_taiga_id": ensemble_id,
+                "feature_metadata_taiga_id": feature_metadata_id,
+                "prediction_matrix_taiga_id": prediction_matrix_id
+            }
+        }
+    }
+    
+    return config
