@@ -27,11 +27,11 @@ def cli():
 
 
 
-def fit_with_sparkles(config_fname, related, sparkles_path, sparkles_config, save_pref):
+def fit_with_sparkles(config_fname, related, sparkles_config, save_pref):
     dt_hash = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
 
     cmd = []
-    cmd.append(sparkles_path)
+    cmd.append("/install/sparkles/bin/sparkles")
     cmd.extend(["--config", sparkles_config])
     cmd.append("sub")
     cmd.extend(
@@ -85,11 +85,11 @@ default_url_prefix=$(awk -F "=" '/default_url_prefix/ {print $2}' "$sparkles_con
 )
 
 
-def validate_run(dt_hash, sparkles_path, sparkles_config, save_pref):
+def validate_run(dt_hash, sparkles_config, save_pref):
     validate_cmd = validate_str.safe_substitute(
         {
             "sparkles_config": sparkles_config,
-            "sparkles_path": sparkles_path,
+            "sparkles_path": "/install/sparkles/bin/sparkles",
             "HASH": dt_hash,
             "save_pref": save_pref,
         }
@@ -178,7 +178,7 @@ def gather_ensemble_tasks(
 
     all_cors = pd.concat(all_cors, ignore_index=True)
     ensemble = all_features.merge(all_cors, on=["target_variable", "model"])
-    
+
     ### The following code is implemented this way due to a
     # PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.
     # De-fragment the DataFrame
@@ -192,9 +192,8 @@ def gather_ensemble_tasks(
 
     # Iterate over each row in the ensemble
     for index, row in ensemble.iterrows():
-        # Get the target variable name from the ensemble
         target_variable = row['target_variable']
-        
+
         # Extract the corresponding target data from `targets` DataFrame
         y = targets[target_variable]
 
@@ -204,16 +203,21 @@ def gather_ensemble_tasks(
             feature_name = row[feature_col]  # Get the feature name listed in the ensemble row
             
             if feature_name in features.columns:
-                # Extract feature data from the features DataFrame
                 x = features[feature_name]
-                
-                # Compute Pearson correlation, handling constant columns
-                if x.std() == 0 or y.std() == 0:
-                    corr = None  # Assign None or NaN if feature or target is constant
+
+                x = x.reset_index(drop=True)
+                y = y.reset_index(drop=True)
+
+                mask = ~pd.isna(x) & ~pd.isna(y)
+
+                x_filtered = x[mask]
+                y_filtered = y[mask]
+
+                if len(x_filtered) > 1 and len(y_filtered) > 1:
+                    corr, _ = pearsonr(x_filtered, y_filtered)
+                    # print("Correlation between", feature_name, "and", target_variable, "is", corr)
                 else:
-                    corr, _ = pearsonr(x, y)
-                
-                # Add correlation as a new column to the ensemble
+                    print("Not enough valid values to compute correlation between", feature_name, "and", target_variable)
                 ensemble.loc[index, f'{feature_col}_correlation'] = corr
 
     for i in range(top_n):
@@ -244,7 +248,6 @@ def check_file_locs(ipt, config):
 def _collect_and_fit(
     input_files,
     ensemble_config,
-    sparkles_path,
     sparkles_config,
     save_dir=None,
     test=False,
@@ -381,14 +384,14 @@ def _collect_and_fit(
         print("submitting fit jobs...")
 
         dt_hash = fit_with_sparkles(
-            ensemble_config, out_rel, sparkles_path, sparkles_config, save_pref
+            ensemble_config, out_rel, sparkles_config, save_pref
         )
 
         # watch sparkles run, resubmit failed jobs, and validate when complete
         # validate_run(dt_hash, sparkles_path, sparkles_config, save_pref)
         validate_dict = {
             "sparkles_config": sparkles_config,
-            "sparkles_path": sparkles_path,
+            "sparkles_path": "/install/sparkles/bin/sparkles",
             "HASH": dt_hash,
             "save_pref": save_pref,
         }
@@ -415,7 +418,6 @@ def _collect_and_fit(
     required=True,
     help="JSON file containing the set of files for prediction",
 )
-@click.option("--sparkles-path", required=True, help="path to the sparkles command")
 @click.option(
     "--sparkles-config", required=True, help="path to the sparkles config file to use"
 )
@@ -457,7 +459,6 @@ def _collect_and_fit(
 )
 def collect_and_fit_generate_config(
     input_files,
-    sparkles_path,
     sparkles_config,
     save_dir=None,
     test=False,
@@ -483,7 +484,6 @@ def collect_and_fit_generate_config(
     _collect_and_fit(
         input_files,
         save_pref / model_config_name,
-        sparkles_path,
         sparkles_config,
         save_dir,
         test,
@@ -505,7 +505,6 @@ def collect_and_fit_generate_config(
     required=True,
     help='YAML file for model configuration. Names of datasets must match those provided in "input-files"',
 )
-@click.option("--sparkles-path", required=True, help="path to the sparkles command")
 @click.option(
     "--sparkles-config", required=True, help="path to the sparkles config file to use"
 )
@@ -527,7 +526,6 @@ def collect_and_fit_generate_config(
 def collect_and_fit(
     input_files,
     ensemble_config,
-    sparkles_path,
     sparkles_config,
     test=False,
     skipfit=False,
@@ -537,7 +535,6 @@ def collect_and_fit(
     _collect_and_fit(
         input_files,
         ensemble_config,
-        sparkles_path,
         sparkles_config,
         save_dir=None,
         test=test,
