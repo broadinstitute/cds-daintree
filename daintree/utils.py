@@ -182,7 +182,8 @@ def create_output_config(model_name, screen_name, input_config, feature_metadata
     config = {
         model_name: {
             "input": {
-                "name": model_name,
+                "model_name": model_name,
+                "screen_name": screen_name,
                 "data": input_config["data"]
             },
             "output": {
