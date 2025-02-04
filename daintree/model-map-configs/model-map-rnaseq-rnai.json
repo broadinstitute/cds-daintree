@@ -1,8 +1,9 @@
 {
-  "name": "DNA",
+  "model_name": "RNASeq",
+  "screen_name": "RNAi",
   "data": {
-      "CRISPR": {
-          "taiga_id":"internal-24q2-3719.82/CRISPRGeneEffect",
+      "RNAi": {
+          "taiga_id":"predictability-legacy-datasets-8c54.14/RNAiDep",
           "table_type":"target_matrix",
           "relation":"All"
       },
@@ -14,7 +15,7 @@
           "exempt": false
       },
       "Confounder": {
-          "taiga_id": "predictability-76d5.111/PredictabilityCRISPRConfoundersTransformed",
+          "taiga_id": "predictability-legacy-datasets-8c54.14/RNAiConfounders",
           "table_type": "feature",
           "dim_type": "confounder",
           "required": true,
@@ -74,6 +75,13 @@
           "table_type": "feature",
           "dim_type": "gene",
           "required": false,
+          "exempt": false
+      },
+      "RNASeq": {
+          "taiga_id": "internal-24q2-3719.82/OmicsExpressionProteinCodingGenesTPMLogp1",
+          "table_type": "feature",
+          "dim_type": "gene",
+          "required": true,
           "exempt": false
       }
     }

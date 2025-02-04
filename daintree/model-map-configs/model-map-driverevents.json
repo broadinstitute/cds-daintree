@@ -1,5 +1,5 @@
 {
-  "model_name": "CellContext",
+  "model_name": "DriverEvents",
   "screen_name": "CRISPR",
   "data": {
       "CRISPR": {
@@ -18,6 +18,13 @@
           "taiga_id": "predictability-76d5.111/PredictabilityCRISPRConfoundersTransformed",
           "table_type": "feature",
           "dim_type": "confounder",
+          "required": true,
+          "exempt": false
+      },
+      "DriverEvents": {
+          "taiga_id": "predictability-76d5.99/DriverEvents",
+          "table_type": "feature",
+          "dim_type": "driverevents",
           "required": true,
           "exempt": false
       }

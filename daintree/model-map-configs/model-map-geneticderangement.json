@@ -1,0 +1,53 @@
+{
+  "model_name": "GeneticDerangement",
+  "screen_name": "CRISPR",
+  "data": {
+      "CRISPR": {
+          "taiga_id":"internal-24q2-3719.82/CRISPRGeneEffect",
+          "table_type":"target_matrix",
+          "relation":"All"
+      },
+      "Lineage": {
+          "taiga_id": "predictability-76d5.94/PredictabilityLineageTransformed",
+          "table_type": "feature",
+          "dim_type": "lineage",
+          "required": true,
+          "exempt": false
+      },
+      "Confounder": {
+          "taiga_id": "predictability-76d5.111/PredictabilityCRISPRConfoundersTransformed",
+          "table_type": "feature",
+          "dim_type": "confounder",
+          "required": true,
+          "exempt": false
+      },
+      "DriverEvents": {
+          "taiga_id": "predictability-76d5.99/DriverEvents",
+          "table_type": "feature",
+          "dim_type": "driverevents",
+          "required": true,
+          "exempt": false
+      },
+      "ArmLevelCN": {
+          "taiga_id": "internal-24q2-3719.82/OmicsArmLevelCNA",
+          "table_type": "feature",
+          "dim_type": "armlevel",
+          "required": true,
+          "exempt": false
+      },
+      "CytobandCN": {
+          "taiga_id": "predictability-76d5.99/PredictabilityGenticDerangementTransformed",
+          "table_type": "feature",
+          "dim_type": "cytoband",
+          "required": true,
+          "exempt": false
+      },
+      "GeneticSignature": {
+          "taiga_id": "internal-24q2-3719.82/OmicsSignatures",
+          "table_type": "feature",
+          "dim_type": "geneticsignature",
+          "required": true,
+          "exempt": false
+      }
+    }
+  }

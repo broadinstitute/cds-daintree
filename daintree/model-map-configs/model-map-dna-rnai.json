@@ -1,8 +1,9 @@
 {
-    "name": "OncRef",
+    "model_name": "DNA",
+    "screen_name": "RNAi",
     "data": {
-        "OncRef": {
-            "taiga_id":"internal-24q2-3719.87/PRISMOncologyReferenceLog2ViabilityCollapsedMatrix",
+        "RNAi": {
+            "taiga_id":"predictability-legacy-datasets-8c54.14/RNAiDep",
             "table_type":"target_matrix",
             "relation":"All"
         },
@@ -14,9 +15,37 @@
             "exempt": false
         },
         "Confounder": {
-            "taiga_id": "internal-24q2-3719.87/PRISMOncologyReferenceConfounderMatrix",
+            "taiga_id": "predictability-legacy-datasets-8c54.14/RNAiConfounders",
             "table_type": "feature",
             "dim_type": "confounder",
+            "required": true,
+            "exempt": false
+        },
+        "DriverEvents": {
+            "taiga_id": "predictability-76d5.99/DriverEvents",
+            "table_type": "feature",
+            "dim_type": "driverevents",
+            "required": true,
+            "exempt": false
+        },
+        "ArmLevelCN": {
+            "taiga_id": "internal-24q2-3719.82/OmicsArmLevelCNA",
+            "table_type": "feature",
+            "dim_type": "armlevel",
+            "required": true,
+            "exempt": false
+        },
+        "CytobandCN": {
+            "taiga_id": "predictability-76d5.99/PredictabilityGenticDerangementTransformed",
+            "table_type": "feature",
+            "dim_type": "cytoband",
+            "required": true,
+            "exempt": false
+        },
+        "GeneticSignature": {
+            "taiga_id": "internal-24q2-3719.82/OmicsSignatures",
+            "table_type": "feature",
+            "dim_type": "geneticsignature",
             "required": true,
             "exempt": false
         },
@@ -41,18 +70,11 @@
             "required": true,
             "exempt": false
         },
-        "Fusions": {
-            "taiga_id": "predictability-76d5.115/PredictabilityFusionTransformed",
-            "table_type": "feature",
-            "dim_type": "fusions",
-            "required": true,
-            "exempt": false
-        },
-        "RNASeq": {
-            "taiga_id": "internal-24q2-3719.82/OmicsExpressionProteinCodingGenesTPMLogp1",
+        "LoH": {
+            "taiga_id": "internal-24q2-3719.82/OmicsLoH",
             "table_type": "feature",
             "dim_type": "gene",
-            "required": true,
+            "required": false,
             "exempt": false
         }
       }

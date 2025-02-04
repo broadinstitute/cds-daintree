@@ -1,5 +1,6 @@
 {
-  "name": "RNASeq",
+  "model_name": "DNA",
+  "screen_name": "CRISPR",
   "data": {
       "CRISPR": {
           "taiga_id":"internal-24q2-3719.82/CRISPRGeneEffect",
@@ -74,13 +75,6 @@
           "table_type": "feature",
           "dim_type": "gene",
           "required": false,
-          "exempt": false
-      },
-      "RNASeq": {
-          "taiga_id": "internal-24q2-3719.82/OmicsExpressionProteinCodingGenesTPMLogp1",
-          "table_type": "feature",
-          "dim_type": "gene",
-          "required": true,
           "exempt": false
       }
     }
