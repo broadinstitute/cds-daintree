@@ -6,7 +6,6 @@ import yaml
 import subprocess
 import os
 from pathlib import Path
-from string import Template
 import click
 
 from utils import (
@@ -82,7 +81,7 @@ def fit_with_sparkles(config_fname, related, sparkles_config, save_pref):
 
 def validate_run(dt_hash, sparkles_config, save_pref):
     """Validate the sparkles run."""
-    
+
     print("Validating sparkles run...")
     sparkles_path = "/install/sparkles/bin/sparkles"
     
@@ -298,6 +297,64 @@ def check_file_locs(ipt, config):
             assert f in ipt_features, f"Feature {f} in model config file does not have corresponding input in {model_name}"
 
 
+def _upload_results_to_taiga(upload_to_taiga, save_pref, model_name, screen_name, ipt_dict):
+    """Upload results to Taiga and create output config."""
+    feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
+    ensemble_filename = f"Ensemble{model_name}{screen_name}.csv"
+    predictions_filename = f"Predictions{model_name}{screen_name}.csv"
+
+    # Upload feature metadata
+    feature_metadata_taiga_info = update_taiga(
+        upload_to_taiga,
+        f"Updated Feature Metadata for Model: {model_name} and Screen: {screen_name}",
+        f"FeatureMetadata{model_name}{screen_name}",
+        save_pref / feature_metadata_filename,
+        "csv_table",
+    )
+    print(f"Feature Metadata uploaded to Taiga: {feature_metadata_taiga_info}")
+
+    # Upload ensemble results
+    ensemble_taiga_info = update_taiga(
+        upload_to_taiga,
+        f"Updated Ensemble for Model: {model_name} and Screen: {screen_name}",
+        f"Ensemble{model_name}{screen_name}",
+        save_pref / ensemble_filename,
+        "csv_table",
+    )
+    print(f"Ensemble uploaded to Taiga: {ensemble_taiga_info}")
+
+    # Upload predictions
+    predictions_taiga_info = update_taiga(
+        upload_to_taiga,
+        f"Updated Predictions for Model: {model_name} and Screen: {screen_name}",
+        f"Predictions{model_name}{screen_name}",
+        save_pref / predictions_filename,
+        "csv_table",
+    )
+    print(f"Predictions uploaded to Taiga: {predictions_taiga_info}")
+
+    # Create and write output config
+    output_config = create_output_config(
+        model_name=model_name,
+        screen_name=screen_name,
+        input_config=ipt_dict,
+        feature_metadata_id=feature_metadata_taiga_info,
+        ensemble_id=ensemble_taiga_info,
+        prediction_matrix_id=predictions_taiga_info
+    )
+
+    # Save output config
+    output_config_dir = save_pref / "output_config_files"
+    output_config_dir.mkdir(parents=True, exist_ok=True)
+    output_config_filename = f"OutputConfig{model_name}{screen_name}.json"
+    output_config_file = output_config_dir / output_config_filename
+
+    with open(output_config_file, 'w') as f:
+        json.dump(output_config, f, indent=4)
+    print(f"Created output config file: {output_config_file}")
+
+    return feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info
+
 def _collect_and_fit(
     input_files,
     ensemble_config,
@@ -445,53 +502,13 @@ def _collect_and_fit(
         df_predictions.to_csv(save_pref / predictions_filename)
 
         if upload_to_taiga:
-            feature_metadata_taiga_info = update_taiga(
+            _upload_results_to_taiga(
                 upload_to_taiga,
-                f"Updated Feature Metadata for Model: {model_name} and Screen: {screen_name}",
-                f"FeatureMetadata{model_name}{screen_name}",
-                save_pref / feature_metadata_filename,
-                "csv_table",
+                save_pref,
+                ipt_dict["model_name"],
+                ipt_dict["screen_name"],
+                ipt_dict
             )
-            print(f"Feature Metadata uploaded to Taiga: {feature_metadata_taiga_info}")
-
-            ensemble_taiga_info = update_taiga(
-                upload_to_taiga,
-                f"Updated Ensemble for Model: {model_name} and Screen: {screen_name}",
-                f"Ensemble{model_name}{screen_name}",
-                save_pref / ensemble_filename,
-                "csv_table",
-            )
-            print(f"Ensemble uploaded to Taiga: {ensemble_taiga_info}")
-
-            predictions_taiga_info = update_taiga(
-                upload_to_taiga,
-                f"Updated Predictions for Model: {model_name} and Screen: {screen_name}",
-                f"Predictions{model_name}{screen_name}",
-                save_pref / predictions_filename,
-                "csv_table",
-            )
-            print(f"Predictions uploaded to Taiga: {predictions_taiga_info}")
-            
-            # Create and write to output config file
-            output_config = create_output_config(
-                model_name=ipt_dict["model_name"],
-                screen_name=ipt_dict["screen_name"],
-                input_config=ipt_dict,
-                feature_metadata_id=feature_metadata_taiga_info,
-                ensemble_id=ensemble_taiga_info,
-                prediction_matrix_id=predictions_taiga_info
-            )
-
-            # Create output_config_files directory if it doesn't exist
-            output_config_dir = save_pref / "output_config_files"
-            output_config_dir.mkdir(parents=True, exist_ok=True)
-
-            output_config_filename = f"OutputConfig{model_name}{screen_name}.json"
-            output_config_file = output_config_dir / output_config_filename
-
-            with open(output_config_file, 'w') as f:
-                json.dump(output_config, f, indent=4)
-            print(f"Created output config file: {output_config_file}")
     else:
         print("skipping fitting and ending run")
 
