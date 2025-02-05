@@ -17,7 +17,7 @@ from utils import (
     process_column_name,
     create_output_config
 )
-from scipy.stats import pearsonr
+from math_utils import calculate_feature_correlations
 from taiga_utils import update_taiga
 from daintree_package import main
 
@@ -174,19 +174,6 @@ def _prepare_partition_paths(partitions_df, save_pref, data_dir, features_suffix
     
     return partitions_df
 
-def _calculate_feature_correlations(x, y):
-    """Calculate correlation between feature and target."""
-    x = x.reset_index(drop=True)
-    y = y.reset_index(drop=True)
-    mask = ~pd.isna(x) & ~pd.isna(y)
-    
-    x_filtered = x[mask]
-    y_filtered = y[mask]
-    
-    if len(x_filtered) > 1 and len(y_filtered) > 1:
-        corr, _ = pearsonr(x_filtered, y_filtered)
-        return corr
-    return None
 
 def _process_model_correlations(model, partitions_df, targets_df):
     """Calculate correlations for a specific model."""
@@ -266,7 +253,7 @@ def gather_ensemble_tasks(
             feature_name = row[feature_col]
             
             if feature_name in features_df.columns:
-                corr = _calculate_feature_correlations(features_df[feature_name], y)
+                corr = calculate_feature_correlations(features_df[feature_name], y)
                 ensemble.loc[index, f'{feature_col}_correlation'] = corr
     
     # Prepare final columns
@@ -520,6 +507,11 @@ def _collect_and_fit(
     help="JSON file containing the set of files for prediction",
 )
 @click.option(
+    "--ensemble-config",
+    required=False,
+    help='YAML file for model configuration. If not provided, will be auto-generated.',
+)
+@click.option(
     "--sparkles-config", 
     required=True, 
     help="path to the sparkles config file to use"
@@ -558,10 +550,11 @@ def _collect_and_fit(
     required=False,
     type=str,
     default=None,
-    help="""if "restrict" is true this provides a list of dependencies to restrict analysis to, separated by semicolons (;). If "restrict" and this is left empty it will not run. """,
+    help="If restrict_targets is true, provide semicolon-separated list of dependencies",
 )
-def collect_and_fit_generate_config(
+def collect_and_fit(
     input_files,
+    ensemble_config,
     sparkles_config,
     save_dir=None,
     test=False,
@@ -570,26 +563,28 @@ def collect_and_fit_generate_config(
     restrict_targets=False,
     restrict_to=None,
 ):
-    """Run model fitting with auto-generated config."""
+    """Run model fitting with either provided or auto-generated config."""
     save_pref = Path(save_dir) if save_dir else Path.cwd()
     print(f"Save directory path: {save_pref}")
     save_pref.mkdir(parents=True, exist_ok=True)
 
-    # Generate config
-    with open(input_files, "r") as f:
-        ipt_dict = json.load(f)
-    config = generate_config(ipt_dict, relation="All")
-    model_config_name = f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
-    config_path = save_pref / model_config_name
-    print(f"Config file path: {config_path}")
-
-    with open(config_path, "w") as f:
-        yaml.dump(config, f, sort_keys=True)
+    # Auto-generate config if not provided
+    if not ensemble_config:
+        with open(input_files, "r") as f:
+            ipt_dict = json.load(f)
+        config = generate_config(ipt_dict, relation="All")
+        model_config_name = f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
+        config_path = save_pref / model_config_name
+        
+        with open(config_path, "w") as f:
+            yaml.dump(config, f, sort_keys=True)
+        
+        ensemble_config = str(config_path)
 
     # Run the model fitting
     _collect_and_fit(
         input_files,
-        str(config_path),
+        ensemble_config,
         sparkles_config,
         save_dir=str(save_pref),
         test=test,
@@ -600,54 +595,6 @@ def collect_and_fit_generate_config(
     )
 
 
-@cli.command()
-@click.option(
-    "--input-files",
-    required=True,
-    help="JSON file containing the set of files for prediction",
-)
-@click.option(
-    "--ensemble-config",
-    required=True,
-    help='YAML file for model configuration. Names of datasets must match those provided in "input-files"',
-)
-@click.option(
-    "--sparkles-config", required=True, help="path to the sparkles config file to use"
-)
-@click.option(
-    "--test",
-    is_flag=False,
-    help="Run a test version, using only five gene dependencies and five features from each dataset",
-)
-@click.option(
-    "--skipfit",
-    is_flag=False,
-    help="Do not execute the fitting, only prepare files. Used for testing",
-)
-@click.option(
-    "--upload-to-taiga",
-    is_flag=True,
-    help="Upload the Y matrix and the feature metadata to Taiga",
-)
-def collect_and_fit(
-    input_files,
-    ensemble_config,
-    sparkles_config,
-    test=False,
-    skipfit=False,
-    upload_to_taiga=None,
-):
-
-    _collect_and_fit(
-        input_files,
-        ensemble_config,
-        sparkles_config,
-        save_dir=None,
-        test=test,
-        skipfit=skipfit,
-        upload_to_taiga=upload_to_taiga,
-    )
-
-
 if __name__ == "__main__":
+    print("Starting Daintree CLI Instance 1")
     cli()
