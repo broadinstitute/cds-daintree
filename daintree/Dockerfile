@@ -20,12 +20,12 @@ RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
 RUN tar -xf google-cloud-cli-458.0.1-linux-x86_64.tar.gz
 RUN ./google-cloud-sdk/install.sh -q
 
-RUN mkdir -p /daintree /daintree_scripts /daintree_package
+RUN mkdir -p /daintree /daintree_scripts
 WORKDIR /daintree
 
 COPY daintree_scripts/ /daintree_scripts/
-COPY daintree_package/ /daintree_package/
 
+# Remove in Future. Only used for testing in local environment.
 COPY token /root/.taiga/token
 COPY broad-achilles.json /root/.sparkles-cache/service-keys/broad-achilles.json
 COPY model-map.json /daintree/model-map.json

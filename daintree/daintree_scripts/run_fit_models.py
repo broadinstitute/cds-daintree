@@ -37,7 +37,7 @@ def _build_sparkles_command(save_pref, config_fname, related, dt_hash, sparkles_
         "/install/sparkles/bin/sparkles",
         "--config", sparkles_config,
         "sub",
-        "-i", "us.gcr.io/broad-achilles/daintree-sparkles:v6",
+        "-i", "us.gcr.io/broad-achilles/daintree-sparkles:v1",
         "-u", main.__file__,
         "-u", f"{save_pref}/target_matrix.ftr:target.ftr",
         "-u", f"{save_pref}/{config_file}:model-config.yaml",
