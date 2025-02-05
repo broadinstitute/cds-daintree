@@ -80,46 +80,65 @@ def fit_with_sparkles(config_fname, related, sparkles_config, save_pref):
     return dt_hash
 
 
-validate_str = Template(
-    """set -ex
-$sparkles_path --config $sparkles_config watch ensemble_$HASH --loglive
-$sparkles_path --config $sparkles_config reset ensemble_$HASH 
-$sparkles_path --config $sparkles_config watch ensemble_$HASH --loglive
-mkdir -p $save_pref/data
-default_url_prefix=$(awk -F "=" '/default_url_prefix/ {print $2}' "$sparkles_config")
-/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file /root/.sparkles-cache/service-keys/broad-achilles.json
-/google-cloud-sdk/bin/gcloud storage ls ${default_url_prefix}/ensemble_$HASH/*/*.csv > $save_pref/completed_jobs.txt
-/install/depmap-py/bin/python3.9 ../daintree_scripts/validate_jobs_complete.py $save_pref/completed_jobs.txt $save_pref/partitions.csv features.csv predictions.csv
-/google-cloud-sdk/bin/gcloud storage cp ${default_url_prefix}/ensemble_$HASH/*/*.csv $save_pref/data
-"""
-)
-
-
 def validate_run(dt_hash, sparkles_config, save_pref):
-    validate_cmd = validate_str.safe_substitute(
-        {
-            "sparkles_config": sparkles_config,
-            "sparkles_path": "/install/sparkles/bin/sparkles",
-            "HASH": dt_hash,
-            "save_pref": save_pref,
-        }
-    )
-    with open("validate.sh", "wt") as f:
-        f.write(validate_cmd)
-        f.close()
-
-    # subprocess.check_call(validate_cmd, shell=True)
-    subprocess.check_call("bash validate.sh", shell=True)
-
-
-def save_and_run_bash(cmd_template, sub_dict):
-    bash_cmd = cmd_template.safe_substitute(sub_dict)
-    with open("bash_cmd.sh", "wt") as f:
-        f.write(bash_cmd)
-        f.close()
-
-    # subprocess.check_call(validate_cmd, shell=True)
-    subprocess.check_call("bash bash_cmd.sh", shell=True)
+    """Validate the sparkles run."""
+    
+    print("Validating sparkles run...")
+    sparkles_path = "/install/sparkles/bin/sparkles"
+    
+    # Watch and reset sparkles jobs
+    subprocess.check_call([sparkles_path, "--config", sparkles_config, "watch", f"ensemble_{dt_hash}", "--loglive"])
+    subprocess.check_call([sparkles_path, "--config", sparkles_config, "reset", f"ensemble_{dt_hash}"])
+    subprocess.check_call([sparkles_path, "--config", sparkles_config, "watch", f"ensemble_{dt_hash}", "--loglive"])
+    
+    # Create output directory
+    os.makedirs(f"{save_pref}/data", exist_ok=True)
+    
+    # Get default_url_prefix from sparkles config
+    with open(sparkles_config, 'r') as f:
+        for line in f:
+            if 'default_url_prefix' in line:
+                default_url_prefix = line.split('=')[1].strip()
+                break
+    
+    # Authenticate and list files
+    subprocess.check_call([
+        "/google-cloud-sdk/bin/gcloud", 
+        "auth", 
+        "activate-service-account", 
+        "--key-file", 
+        "/root/.sparkles-cache/service-keys/broad-achilles.json"
+    ])
+    
+    # List and save completed jobs
+    completed_jobs = subprocess.check_output([
+        "/google-cloud-sdk/bin/gcloud", 
+        "storage", 
+        "ls", 
+        f"{default_url_prefix}/ensemble_{dt_hash}/*/*.csv"
+    ]).decode()
+    
+    with open(f"{save_pref}/completed_jobs.txt", 'w') as f:
+        f.write(completed_jobs)
+    
+    # Validate jobs
+    subprocess.check_call([
+        "/install/depmap-py/bin/python3.9",
+        "../daintree_scripts/validate_jobs_complete.py",
+        f"{save_pref}/completed_jobs.txt",
+        f"{save_pref}/partitions.csv",
+        "features.csv",
+        "predictions.csv"
+    ])
+    
+    # Copy results
+    subprocess.check_call([
+        "/google-cloud-sdk/bin/gcloud",
+        "storage",
+        "cp",
+        f"{default_url_prefix}/ensemble_{dt_hash}/*/*.csv",
+        f"{save_pref}/data"
+    ])
 
 
 def _load_and_prepare_data(save_pref, features, targets, partitions):
@@ -415,14 +434,8 @@ def _collect_and_fit(
         )
 
         # watch sparkles run, resubmit failed jobs, and validate when complete
-        # validate_run(dt_hash, sparkles_path, sparkles_config, save_pref)
-        validate_dict = {
-            "sparkles_config": sparkles_config,
-            "sparkles_path": "/install/sparkles/bin/sparkles",
-            "HASH": dt_hash,
-            "save_pref": save_pref,
-        }
-        save_and_run_bash(validate_str, validate_dict)
+        validate_run(dt_hash, sparkles_config, save_pref)
+        
         # gather the ensemble results and collect the top features
         df_ensemble, df_predictions = gather_ensemble_tasks(
             save_pref, features=str(save_pref / "X.ftr"), targets=str(save_pref / "target_matrix.ftr"), top_n=50
