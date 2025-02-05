@@ -20,54 +20,63 @@ from utils import (
 )
 from scipy.stats import pearsonr
 from taiga_utils import update_taiga
-
+from daintree_package import main
 
 @click.group()
 def cli():
     pass
 
 
+def _build_sparkles_command(save_pref, config_fname, related, dt_hash, sparkles_config):
+    """Build the sparkles command with all required arguments."""
+    
+    # Ensure config_fname is just the filename, not the full path
+    config_file = Path(config_fname).name
+    
+    cmd = [
+        "/install/sparkles/bin/sparkles",
+        "--config", sparkles_config,
+        "sub",
+        "-i", "us.gcr.io/broad-achilles/daintree-sparkles:v6",
+        "-u", main.__file__,
+        "-u", f"{save_pref}/target_matrix.ftr:target.ftr",
+        "-u", f"{save_pref}/{config_file}:model-config.yaml",
+        "-u", f"{save_pref}/X.ftr:X.ftr",
+        "-u", f"{save_pref}/X_feature_metadata.ftr:X_feature_metadata.ftr",
+        "-u", f"{save_pref}/X_valid_samples.ftr:X_valid_samples.ftr",
+        "-u", f"{save_pref}/partitions.csv",
+        "--params", f"{save_pref}/partitions.csv",
+        "--skipifexists",
+        "--nodes", "100",
+        "-n", f"ensemble_{dt_hash}",
+        "/install/depmap-py/bin/daintree", "fit-model",
+        "--x", "X.ftr",
+        "--y", "target.ftr",
+        "--model-config", "model-config.yaml",
+        "--n-folds", "5",
+        "--target-range", "{start}", "{end}",
+        "--model", "{model}"
+    ]
+
+    if related:
+        cmd.extend([
+            "-u", f"{save_pref}/related.ftr:related.ftr",
+            "--related-table", "related.ftr"
+        ])
+
+    return cmd
+
 
 def fit_with_sparkles(config_fname, related, sparkles_config, save_pref):
+    """Run model fitting using sparkles."""
     dt_hash = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
-
-    cmd = []
-    cmd.append("/install/sparkles/bin/sparkles")
-    cmd.extend(["--config", sparkles_config])
-    cmd.append("sub")
-    cmd.extend(
-        ["-i", "us.gcr.io/broad-achilles/daintree-sparkles:v4"]
-    )
-    cmd.extend(["-u", "/daintree/daintree_package/daintree_package/main.py"])
-    cmd.extend(["-u", str(save_pref / "target_matrix.ftr") + ":target.ftr"])
-    cmd.extend(["-u", str(save_pref / config_fname) + ":model-config.yaml"])
-    cmd.extend(["-u", str(save_pref / "X.ftr") + ":X.ftr"])
-    if related:
-        cmd.extend(["-u", str(save_pref / "related.ftr") + ":related.ftr"])
-    cmd.extend(
-        ["-u", str(save_pref / "X_feature_metadata.ftr") + ":X_feature_metadata.ftr"]
-    )
-    cmd.extend(["-u", str(save_pref / "X_valid_samples.ftr") + ":X_valid_samples.ftr"])
-    cmd.extend(["-u", str(save_pref / "partitions.csv")])
-    cmd.extend(["--params", str(save_pref / "partitions.csv")])
-    cmd.append("--skipifexists")
-    cmd.extend(["--nodes", "100"])
-    cmd.extend(["-n", "ensemble_" + dt_hash])
-    cmd.extend(["/install/depmap-py/bin/daintree", "fit-model"])
-    cmd.extend(["--x", "X.ftr"])
-    cmd.extend(["--y", "target.ftr"])
-    cmd.extend(["--model-config", "model-config.yaml"])
-    cmd.extend(["--n-folds", "5"])
-    if related:
-        cmd.extend(["--related-table", "related.ftr"])
-    cmd.extend(["--feature-metadata", "X_feature_metadata.ftr"])
-    cmd.extend(["--model-valid-samples", "X_valid_samples.ftr"])
-    cmd.extend(["--target-range", "{start}", "{end}"])
-    cmd.extend(["--model", "{model}"])
+    
+    cmd = _build_sparkles_command(save_pref, config_fname, related, dt_hash, sparkles_config)
     print(f"Running sparkles with command: {cmd}")
-    print(cmd)
+    
     subprocess.check_call(cmd)
     print("sparkles run complete")
+    
     return dt_hash
 
 
@@ -80,7 +89,7 @@ mkdir -p $save_pref/data
 default_url_prefix=$(awk -F "=" '/default_url_prefix/ {print $2}' "$sparkles_config")
 /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file /root/.sparkles-cache/service-keys/broad-achilles.json
 /google-cloud-sdk/bin/gcloud storage ls ${default_url_prefix}/ensemble_$HASH/*/*.csv > $save_pref/completed_jobs.txt
-/install/depmap-py/bin/python3.9 validate_jobs_complete.py $save_pref/completed_jobs.txt $save_pref/partitions.csv features.csv predictions.csv
+/install/depmap-py/bin/python3.9 ../daintree_scripts/validate_jobs_complete.py $save_pref/completed_jobs.txt $save_pref/partitions.csv features.csv predictions.csv
 /google-cloud-sdk/bin/gcloud storage cp ${default_url_prefix}/ensemble_$HASH/*/*.csv $save_pref/data
 """
 )
@@ -113,6 +122,72 @@ def save_and_run_bash(cmd_template, sub_dict):
     subprocess.check_call("bash bash_cmd.sh", shell=True)
 
 
+def _load_and_prepare_data(save_pref, features, targets, partitions):
+    """Load and prepare the basic data needed for ensemble tasks."""
+    features_df = pd.read_feather(save_pref / features)
+    targets_df = pd.read_feather(save_pref / targets)
+    targets_df = targets_df.set_index("Row.name")
+    partitions_df = pd.read_csv(save_pref / partitions)
+    
+    return features_df, targets_df, partitions_df
+
+def _prepare_partition_paths(partitions_df, save_pref, data_dir, features_suffix, predictions_suffix):
+    """Add file paths to the partitions dataframe."""
+    partitions_df["path_prefix"] = (
+        data_dir
+        + "/"
+        + partitions_df["model"]
+        + "_"
+        + partitions_df["start"].map(str)
+        + "_"
+        + partitions_df["end"].map(str)
+        + "_"
+    )
+    partitions_df["feature_path"] = save_pref / (
+        partitions_df["path_prefix"] + features_suffix
+    )
+    partitions_df["predictions_path"] = save_pref / (
+        partitions_df["path_prefix"] + predictions_suffix
+    )
+    
+    # Validate paths exist
+    assert all(os.path.exists(f) for f in partitions_df["feature_path"])
+    assert all(os.path.exists(f) for f in partitions_df["predictions_path"])
+    
+    return partitions_df
+
+def _calculate_feature_correlations(x, y):
+    """Calculate correlation between feature and target."""
+    x = x.reset_index(drop=True)
+    y = y.reset_index(drop=True)
+    mask = ~pd.isna(x) & ~pd.isna(y)
+    
+    x_filtered = x[mask]
+    y_filtered = y[mask]
+    
+    if len(x_filtered) > 1 and len(y_filtered) > 1:
+        corr, _ = pearsonr(x_filtered, y_filtered)
+        return corr
+    return None
+
+def _process_model_correlations(model, partitions_df, targets_df):
+    """Calculate correlations for a specific model."""
+    predictions_filenames = partitions_df[partitions_df["model"] == model]["predictions_path"]
+    predictions = pd.DataFrame().join(
+        [pd.read_csv(f, index_col=0) for f in predictions_filenames], 
+        how="outer"
+    )
+    
+    cors = predictions.corrwith(targets_df)
+    cors = (
+        pd.DataFrame(cors)
+        .reset_index()
+        .rename(columns={"index": "target_variable", 0: "pearson"})
+    )
+    cors["model"] = model
+    
+    return cors
+
 def gather_ensemble_tasks(
     save_pref,
     features="X.ftr",
@@ -123,112 +198,70 @@ def gather_ensemble_tasks(
     predictions_suffix="predictions.csv",
     top_n=50,
 ):
-    features = pd.read_feather(save_pref / features)
-    targets = pd.read_feather(save_pref / targets)
-    targets = targets.set_index("Row.name")
-
-    partitions = pd.read_csv(save_pref / partitions)
-    partitions["path_prefix"] = (
-        data_dir
-        + "/"
-        + partitions["model"]
-        + "_"
-        + partitions["start"].map(str)
-        + "_"
-        + partitions["end"].map(str)
-        + "_"
+    """Gather and process ensemble tasks with improved organization."""
+    # Load basic data
+    features_df, targets_df, partitions_df = _load_and_prepare_data(
+        save_pref, features, targets, partitions
     )
-    partitions["feature_path"] = save_pref / (
-        partitions["path_prefix"] + features_suffix
+    
+    # Prepare partition paths
+    partitions_df = _prepare_partition_paths(
+        partitions_df, save_pref, data_dir, features_suffix, predictions_suffix
     )
-    partitions["predictions_path"] = save_pref / (
-        partitions["path_prefix"] + predictions_suffix
-    )
-
-    assert all(os.path.exists(f) for f in partitions["feature_path"])
-    assert all(os.path.exists(f) for f in partitions["predictions_path"])
-
+    
+    # Process features
     all_features = pd.concat(
-        [pd.read_csv(f) for f in partitions["feature_path"]], ignore_index=True
+        [pd.read_csv(f) for f in partitions_df["feature_path"]], 
+        ignore_index=True
     )
-
     all_features.drop(["score0", "score1", "best"], axis=1, inplace=True)
-
-    # Get pearson correlation of predictions by model
+    
+    # Load and combine predictions
+    predictions = pd.DataFrame().join(
+        [pd.read_csv(f, index_col=0) for f in partitions_df["predictions_path"]], 
+        how="outer"
+    )
+    
+    # Calculate correlations for all models
     all_cors = []
     for model in all_features["model"].unique():
-        # Merge all files for model
-        predictions_filenames = partitions[partitions["model"] == model][
-            "predictions_path"
-        ]
-        predictions = pd.DataFrame().join(
-            [pd.read_csv(f, index_col=0) for f in predictions_filenames], how="outer"
-        )
-
-        cors = predictions.corrwith(targets)
-
-        # Reshape
-        cors = (
-            pd.DataFrame(cors)
-            .reset_index()
-            .rename(columns={"index": "target_variable", 0: "pearson"})
-        )
-        cors["model"] = model
-
+        cors = _process_model_correlations(model, partitions_df, targets_df)
         all_cors.append(cors)
-
+    
     all_cors = pd.concat(all_cors, ignore_index=True)
     ensemble = all_features.merge(all_cors, on=["target_variable", "model"])
-
-    ### The following code is implemented this way due to a
-    # PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.
-    # De-fragment the DataFrame
+    
+    # Calculate rankings and best models
     ensemble = ensemble.copy()
-
-    # Get the highest correlation across models per "target_variable" (entity)
     ranked_pearson = ensemble.groupby("target_variable")["pearson"].rank(ascending=False)
     ensemble["best"] = (ranked_pearson == 1)
-
+    
+    # Calculate feature correlations
     ensb_cols = ["target_variable", "model", "pearson", "best"]
-
-    # Iterate over each row in the ensemble
+    
     for index, row in ensemble.iterrows():
         target_variable = row['target_variable']
-
-        # Extract the corresponding target data from `targets` DataFrame
-        y = targets[target_variable]
-
-        # Iterate over feature columns in the ensemble
-        for i in range(top_n):  # Assuming there are 50 features (feature0 to feature49)
-            feature_col = f'feature{i}'
-            feature_name = row[feature_col]  # Get the feature name listed in the ensemble row
-            
-            if feature_name in features.columns:
-                x = features[feature_name]
-
-                x = x.reset_index(drop=True)
-                y = y.reset_index(drop=True)
-
-                mask = ~pd.isna(x) & ~pd.isna(y)
-
-                x_filtered = x[mask]
-                y_filtered = y[mask]
-
-                if len(x_filtered) > 1 and len(y_filtered) > 1:
-                    corr, _ = pearsonr(x_filtered, y_filtered)
-                    # print("Correlation between", feature_name, "and", target_variable, "is", corr)
-                else:
-                    print("Not enough valid values to compute correlation between", feature_name, "and", target_variable)
-                ensemble.loc[index, f'{feature_col}_correlation'] = corr
-
-    for i in range(top_n):
-        feature_importance_cols = ["feature" + str(i), "feature" + str(i) + "_importance"]
-        ensb_cols += feature_importance_cols
-        feature_correlations_cols = ["feature" + str(i) + "_correlation"]
-        ensb_cols += feature_correlations_cols
+        y = targets_df[target_variable]
         
+        for i in range(top_n):
+            feature_col = f'feature{i}'
+            feature_name = row[feature_col]
+            
+            if feature_name in features_df.columns:
+                corr = _calculate_feature_correlations(features_df[feature_name], y)
+                ensemble.loc[index, f'{feature_col}_correlation'] = corr
+    
+    # Prepare final columns
+    for i in range(top_n):
+        feature_cols = [
+            f"feature{i}", 
+            f"feature{i}_importance",
+            f"feature{i}_correlation"
+        ]
+        ensb_cols.extend(feature_cols)
+    
     ensemble = ensemble.sort_values(["target_variable", "model"])[ensb_cols]
-
+    
     return ensemble, predictions
 
 
@@ -258,17 +291,17 @@ def _collect_and_fit(
     restrict_to=None,
 ):
     tc = create_taiga_client_v3()
-    save_pref = Path(os.getcwd())
-    if save_dir is not None:
-        save_pref = Path(save_dir)
-        save_pref.mkdir(parents=True, exist_ok=True)
+    # Use the provided save_dir directly without modification
+    save_pref = Path(save_dir) if save_dir else Path.cwd()
+    print(f"_collect_and_fit save directory: {save_pref}")
+    save_pref.mkdir(parents=True, exist_ok=True)
+    
     print("loading input files...")
     with open(input_files, "r") as f:
         ipt_dict = json.load(f)
-        f.close()
     with open(ensemble_config, "r") as f:
         config_dict = yaml.load(f, yaml.SafeLoader)
-        f.close()
+
     print("validating inputs...")
     # check that all datasets in the model config are represented in the input file dict
     check_file_locs(ipt_dict, config_dict)
@@ -457,30 +490,32 @@ def _collect_and_fit(
     help="JSON file containing the set of files for prediction",
 )
 @click.option(
-    "--sparkles-config", required=True, help="path to the sparkles config file to use"
+    "--sparkles-config", 
+    required=True, 
+    help="path to the sparkles config file to use"
 )
 @click.option(
     "--save-dir",
     required=False,
-    help="""path to where the data should be stored if not the same directory as the script. path is relative to current working directory""",
+    help="Path to where the data should be stored if not the same directory as the script",
 )
 @click.option(
     "--test",
     default=False,
     type=bool,
-    help="Run a test version, using only five gene dependencies and five features from each dataset",
+    help="Run a test version with limited data",
 )
 @click.option(
     "--skipfit",
     default=False,
     type=bool,
-    help="Do not execute the fitting, only prepare files. Used for testing",
+    help="Only prepare files without fitting (for testing)",
 )
 @click.option(
     "--upload-to-taiga",
     default=None,
     type=str,
-    help="Upload the Y matrix and the feature metadata to Taiga",
+    help="Upload results to Taiga",
 )
 @click.option(
     "--restrict-targets",
@@ -505,30 +540,33 @@ def collect_and_fit_generate_config(
     restrict_targets=False,
     restrict_to=None,
 ):
+    """Run model fitting with auto-generated config."""
+    save_pref = Path(save_dir) if save_dir else Path.cwd()
+    print(f"Save directory path: {save_pref}")
+    save_pref.mkdir(parents=True, exist_ok=True)
+
+    # Generate config
     with open(input_files, "r") as f:
         ipt_dict = json.load(f)
-        f.close()
-    save_pref = Path(os.getcwd())
-    if save_dir is not None:
-        save_pref /= save_dir
-        save_pref.mkdir(parents=True, exist_ok=True)
     config = generate_config(ipt_dict, relation="All")
-    dt_hash = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
-    model_config_name = "model-config" + "_temp_" + ".yaml"
+    model_config_name = f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
+    config_path = save_pref / model_config_name
+    print(f"Config file path: {config_path}")
 
-    with open(save_pref / model_config_name, "w") as f:
+    with open(config_path, "w") as f:
         yaml.dump(config, f, sort_keys=True)
 
+    # Run the model fitting
     _collect_and_fit(
         input_files,
-        save_pref / model_config_name,
+        str(config_path),
         sparkles_config,
-        save_dir,
-        test,
-        skipfit,
-        upload_to_taiga,
-        restrict_targets,
-        restrict_to,
+        save_dir=str(save_pref),
+        test=test,
+        skipfit=skipfit,
+        upload_to_taiga=upload_to_taiga,
+        restrict_targets=restrict_targets,
+        restrict_to=restrict_to,
     )
 
 
