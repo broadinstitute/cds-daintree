@@ -20,10 +20,10 @@ RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
 RUN tar -xf google-cloud-cli-458.0.1-linux-x86_64.tar.gz
 RUN ./google-cloud-sdk/install.sh -q
 
-RUN mkdir -p /daintree /daintree_scripts
+RUN mkdir -p /daintree
 WORKDIR /daintree
 
-COPY daintree_scripts/ /daintree_scripts/
+COPY daintree_scripts/ /daintree/daintree_scripts/
 
 # Remove in Future. Only used for testing in local environment.
 COPY token /root/.taiga/token
