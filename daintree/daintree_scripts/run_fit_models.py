@@ -7,19 +7,13 @@ import subprocess
 import os
 from pathlib import Path
 import click
+import re
+import numpy as np
 
-from utils import (
-    generate_config,
-    generate_feature_info,
-    partiton_inputs,
-    process_dep_matrix,
-    process_biomarker_matrix,
-    process_column_name,
-    create_output_config
-)
-from math_utils import calculate_feature_correlations
-from taiga_utils import update_taiga
+from config import TEST_LIMIT, filter_columns_gene, filter_columns_oncref
+from utils import calculate_feature_correlations, update_taiga
 from daintree_package import main
+
 
 @click.group()
 def cli():
@@ -285,7 +279,45 @@ class ModelFitter:
             for f in features:
                 assert f in ipt_features, f"Feature {f} in model config file does not have corresponding input in {model_name}"
 
+    def _create_output_config(self, model_name, screen_name, input_config, 
+                            feature_metadata_id, ensemble_id, prediction_matrix_id):
+        """Create output configuration JSON file.
+        
+        Args:
+            model_name: Name of the model
+            screen_name: Name of the screen
+            input_config: Input configuration
+            feature_metadata_id: Taiga ID for feature metadata
+            ensemble_id: Taiga ID for ensemble
+            prediction_matrix_id: Taiga ID for prediction matrix
+            
+        Returns:
+            dict: Output configuration dictionary
+        """
+        config = {
+            model_name: {
+                "input": {
+                    "model_name": model_name,
+                    "screen_name": screen_name,
+                    "data": input_config["data"]
+                },
+                "output": {
+                    "ensemble_taiga_id": ensemble_id,
+                    "feature_metadata_taiga_id": feature_metadata_id,
+                    "prediction_matrix_taiga_id": prediction_matrix_id
+                }
+            }
+        }
+        return config
+
     def _upload_results_to_taiga(self, model_name, screen_name, ipt_dict):
+        """Upload results to Taiga and create output config file.
+        
+        Args:
+            model_name: Name of the model
+            screen_name: Name of the screen
+            ipt_dict: Input configuration dictionary
+        """
         feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
         ensemble_filename = f"Ensemble{model_name}{screen_name}.csv"
         predictions_filename = f"Predictions{model_name}{screen_name}.csv"
@@ -317,7 +349,7 @@ class ModelFitter:
         )
         print(f"Predictions uploaded to Taiga: {predictions_taiga_info}")
 
-        output_config = create_output_config(
+        output_config = self._create_output_config(
             model_name=model_name,
             screen_name=screen_name,
             input_config=ipt_dict,
@@ -337,10 +369,205 @@ class ModelFitter:
 
         return feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info
 
+    def _clean_dataframe(self, df, index_col):
+        """Clean and sort the dataframe.
+        
+        Args:
+            df: Input dataframe
+            index_col: Column to use as index
+        """
+        df.sort_index(inplace=True, axis=1)
+
+        if index_col is None:
+            df.sort_values(df.columns.tolist(), inplace=True)
+        else:
+            df.sort_index(inplace=True)
+
+        return df
+
+    def _process_biomarker_matrix(self, df, index_col=0, test=False):
+        """Process biomarker matrix data.
+        
+        Args:
+            df: Input dataframe
+            index_col: Column to use as index
+            test: Whether to limit data for testing
+        """
+        df = self._clean_dataframe(df, index_col)  # Use the class method instead
+
+        print("Start Processing Biomarker Matrix")
+        if test:
+            df = df.iloc[:, :]
+        print(df.head())
+        print("End Processing Biomarker Matrix")
+        return df
+
+    def _process_dep_matrix(self, df, test=False, restrict_targets=False, restrict_to=None):
+        """Process dependency matrix data.
+        
+        Args:
+            df: Input dataframe
+            test: Whether to limit data for testing
+            restrict_targets: Whether to restrict to specific targets
+            restrict_to: Target restrictions if restrict_targets is True
+        """
+        # Drop null rows and columns
+        df = df.dropna(how="all", axis=0)
+        df = df.dropna(how="all", axis=1)
+        df.index.name = "Row.name"
+        df = df.reset_index()
+
+        if test:
+            if restrict_targets:
+                print("target restriction:", restrict_to)
+                restrict_deps = restrict_to.split(";")
+                df = df[["Row.name"] + restrict_deps]
+            else:
+                # Create a regex pattern with word boundaries
+                pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns_gene) + r')\b'
+                # Create a boolean mask for columns that contain any of the filter_columns as whole words
+                mask = df.columns.str.contains(pattern, regex=True)
+                # Use the mask to select the desired columns
+                df = df.loc[:, mask]
+        elif restrict_targets:
+            restrict_deps = restrict_to.split(";")
+            df = df[["Row.name"] + restrict_deps]
+
+        print("Start Processing Dependency Matrix")
+        print(df)
+        print("End Processing Dependency Matrix")
+        return df
+
+    def _process_column_name(self, col, feature_dataset_name):
+        """Process column name to generate feature name, label, and ID.
+        
+        Args:
+            col: Column name to process
+            feature_dataset_name: Name of the feature dataset
+            
+        Returns:
+            tuple: (feature_name, feature_label, given_id)
+        """
+        match = re.match(r"(.+?) \((\d+)\)", col)
+        if match:
+            feature_label, given_id = match.groups()
+            feature_name = f"{feature_label.replace('-', '_')}_({given_id})_{feature_dataset_name}"
+        else:
+            feature_label = col
+            given_id = col
+            feature_name = re.sub(r'[\s-]+', '_', col) + f"_{feature_dataset_name}"
+        return feature_name, feature_label, given_id
+
+    def _partition_inputs(self, dep_matrix, ensemble_config, save_pref, out_name="partitions.csv"):
+        """Partition inputs for parallel processing.
+        
+        Args:
+            dep_matrix: Dependency matrix
+            ensemble_config: Configuration for ensemble models
+            save_pref: Save directory path
+            out_name: Output filename
+        """
+        num_genes = dep_matrix.shape[1]
+        start_indexes = []
+        end_indexes = []
+        models = []
+
+        for model_name, model_config in ensemble_config.items():
+            num_jobs = int(model_config["Jobs"])
+            start_index = np.array(range(0, num_genes, num_jobs))
+            end_index = start_index + num_jobs
+            end_index[-1] = num_genes
+            start_indexes.append(start_index)
+            end_indexes.append(end_index)
+            models.append([model_name] * len(start_index))
+
+        param_df = pd.DataFrame(
+            {
+                "start": np.concatenate(start_indexes),
+                "end": np.concatenate(end_indexes),
+                "model": np.concatenate(models),
+            }
+        )
+        param_df.to_csv(save_pref / out_name, index=False)
+
+    def _generate_config(self, input_dict, relation="All"):
+        """Generate configuration for model.
+        
+        Args:
+            input_dict: Input dictionary containing model configuration
+            relation: Relation type
+        """
+        model_name = input_dict["model_name"]
+        data = input_dict["data"]
+
+        features = [
+            key for key, value in data.items()
+            if value.get("table_type") == "feature"
+        ]
+        required = [
+            key for key, value in data.items()
+            if value.get("table_type") == "feature" and value.get("required", False)
+        ]
+        exempt = [
+            key for key, value in data.items()
+            if value.get("table_type") == "feature" and value.get("exempt", False)
+        ]
+        relation = next(
+            (value["relation"] for value in data.values() if value.get("table_type") == "target_matrix"),
+            "All"
+        )
+        model_config = {
+            "Features": features,
+            "Required": required,
+            "Relation": relation,
+            "Jobs": 10
+        }
+        
+        if relation == "MatchRelated":
+            related = next(
+                (key for key, value in data.items() if value.get("table_type") == "relation"),
+                None
+            )
+            if related:
+                model_config["Related"] = related
+        
+        if exempt:
+            model_config["Exempt"] = exempt
+
+        return {model_name: model_config}
+
+    def _generate_feature_info(self, ipt_dicts, save_pref):
+        """Generate feature information.
+        
+        Args:
+            ipt_dicts: Input dictionaries
+            save_pref: Save directory path
+        """
+        dsets = []
+        for dset_name, dset_value in ipt_dicts["data"].items():
+            if dset_value["table_type"] == "feature":
+                dsets.append(dset_name)
+        fnames = [str(save_pref / (dset + ".csv")) for dset in dsets]
+
+        df = pd.DataFrame({"dataset": dsets, "filename": fnames,})
+        return df
+
     def run(self):
         print("loading input files...")
         with open(self.input_files, "r") as f:
             ipt_dict = json.load(f)
+
+        # Auto-generate config if not provided
+        if not self.ensemble_config:
+            config = self._generate_config(ipt_dict, relation="All")  # Updated to use class method
+            model_config_name = f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
+            config_path = self.save_pref / model_config_name
+            
+            with open(config_path, "w") as f:
+                yaml.dump(config, f, sort_keys=True)
+            
+            self.ensemble_config = str(config_path)
+
         with open(self.ensemble_config, "r") as f:
             config_dict = yaml.load(f, yaml.SafeLoader)
 
@@ -351,7 +578,7 @@ class ModelFitter:
         ), "Exactly one dataset labeled 'target_matrix' is required"
 
         print("generating feature index and files...")
-        feature_info = generate_feature_info(ipt_dict, self.save_pref)
+        feature_info = self._generate_feature_info(ipt_dict, self.save_pref)  # Updated to use class method
 
         print("processing relations...")
         # determine whether to provide output_related
@@ -380,12 +607,12 @@ class ModelFitter:
             if (related_dset is None) or (
                 (related_dset is not None) and dataset_name != related_dset
             ):
-                _df = process_biomarker_matrix(_df, 0, self.test)
+                _df = self._process_biomarker_matrix(_df, 0, self.test)
             print(f"processed dataset: {dataset_name}")
             print(_df.head())
 
             for col in _df.columns:
-                feature_name, feature_label, given_id = process_column_name(col, dataset_name)
+                feature_name, feature_label, given_id = self._process_column_name(col, dataset_name)
                 new_row = pd.DataFrame({
                     "model": [model_name],
                     "feature_name": [feature_name],
@@ -401,11 +628,10 @@ class ModelFitter:
         print("#######################")
 
         print("processing dependency data...")
-        # load, process, and save dependency matrix
         dep_matrix_taiga_id = next((v.get("taiga_id") for v in ipt_dict["data"].values() if v.get("table_type") == "target_matrix"), None)
         print(f"dep_matrix_taiga_id: {dep_matrix_taiga_id}")
         df_dep = self.tc.get(dep_matrix_taiga_id)
-        df_dep = process_dep_matrix(df_dep, self.test, self.restrict_targets, self.restrict_to)
+        df_dep = self._process_dep_matrix(df_dep, self.test, self.restrict_targets, self.restrict_to)
         df_dep.to_feather(self.save_pref / "target_matrix.ftr")
 
         feature_info.to_csv(self.save_pref / "feature_info.csv")
@@ -441,7 +667,7 @@ class ModelFitter:
         subprocess.check_call(prep_x_cmd)
 
         print("partitioning inputs...")
-        partiton_inputs(df_dep, config_dict, self.save_pref, out_name="partitions.csv")
+        self._partition_inputs(df_dep, config_dict, self.save_pref, out_name="partitions.csv")  # Updated to use class method
 
         if not self.skipfit:
             print("submitting fit jobs...")
@@ -540,19 +766,6 @@ def collect_and_fit(
     save_pref = Path(save_dir) if save_dir else Path.cwd()
     print(f"Save directory path: {save_pref}")
     save_pref.mkdir(parents=True, exist_ok=True)
-
-    # Auto-generate config if not provided
-    if not ensemble_config:
-        with open(input_files, "r") as f:
-            ipt_dict = json.load(f)
-        config = generate_config(ipt_dict, relation="All")
-        model_config_name = f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
-        config_path = save_pref / model_config_name
-        
-        with open(config_path, "w") as f:
-            yaml.dump(config, f, sort_keys=True)
-        
-        ensemble_config = str(config_path)
 
     # Run the model fitting
     model_fitter = ModelFitter(
