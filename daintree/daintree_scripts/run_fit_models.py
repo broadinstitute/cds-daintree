@@ -89,6 +89,26 @@ class SparklesRunner:
         subprocess.check_call([self.sparkles_path, "--config", self.sparkles_config, 
                              "reset", f"ensemble_{self.dt_hash}"])
 
+    def _validate_jobs_complete(self):
+        """Validate that all expected job outputs exist"""
+        with open(f"{self.save_pref}/completed_jobs.txt") as f:
+            completed_jobs = {l.split("/")[-1].strip() for l in f.readlines()}
+
+        partitions = pd.read_csv(f"{self.save_pref}/partitions.csv")
+        partitions["path_prefix"] = (
+            partitions["model"]
+            + "_"
+            + partitions["start"].map(str)
+            + "_"
+            + partitions["end"].map(str)
+            + "_"
+        )
+        partitions["feature_path"] = partitions["path_prefix"] + "features.csv"
+        partitions["predictions_path"] = partitions["path_prefix"] + "predictions.csv"
+
+        assert len(set(partitions["feature_path"]) - completed_jobs) == 0, "Missing feature files"
+        assert len(set(partitions["predictions_path"]) - completed_jobs) == 0, "Missing prediction files"
+
     def _process_completed_jobs(self):
         os.makedirs(f"{self.save_pref}/data", exist_ok=True)
         default_url_prefix = self._get_default_url_prefix()
@@ -103,7 +123,7 @@ class SparklesRunner:
         ]).decode()
         
         self._save_completed_jobs(completed_jobs)
-        self._validate_jobs()
+        self._validate_jobs_complete()
         self._copy_results_to_local()
 
     def _get_default_url_prefix(self):
@@ -124,16 +144,6 @@ class SparklesRunner:
     def _save_completed_jobs(self, completed_jobs):
         with open(f"{self.save_pref}/completed_jobs.txt", 'w') as f:
             f.write(completed_jobs)
-
-    def _validate_jobs(self):
-        subprocess.check_call([
-            "/install/depmap-py/bin/python3.9",
-            "/daintree/daintree_scripts/validate_jobs_complete.py",
-            f"{self.save_pref}/completed_jobs.txt",
-            f"{self.save_pref}/partitions.csv",
-            "features.csv",
-            "predictions.csv"
-        ])
 
     def _copy_results_to_local(self):
         default_url_prefix = self._get_default_url_prefix()
