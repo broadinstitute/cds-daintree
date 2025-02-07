@@ -256,7 +256,8 @@ class ModelFitter:
     def __init__(self, input_files, ensemble_config, sparkles_config, 
                  save_dir=None, test=False, skipfit=False, 
                  upload_to_taiga=None, 
-                 restrict_targets=False, restrict_to=None):
+                 restrict_targets=False, restrict_to=None,
+                 filter_columns=None):
         self.tc = create_taiga_client_v3()
         self.save_pref = Path(save_dir) if save_dir else Path.cwd()
         self.input_files = input_files
@@ -267,6 +268,7 @@ class ModelFitter:
         self.upload_to_taiga = upload_to_taiga
         self.restrict_targets = restrict_targets
         self.restrict_to = restrict_to
+        self.filter_columns = filter_columns.split(";") if filter_columns else None
         self.save_pref.mkdir(parents=True, exist_ok=True)
 
     def _check_file_locs(self, ipt, config):
@@ -423,12 +425,18 @@ class ModelFitter:
                 restrict_deps = restrict_to.split(";")
                 df = df[["Row.name"] + restrict_deps]
             else:
-                # Create a regex pattern with word boundaries
-                pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns_gene) + r')\b'
-                # Create a boolean mask for columns that contain any of the filter_columns as whole words
-                mask = df.columns.str.contains(pattern, regex=True)
-                # Use the mask to select the desired columns
-                df = df.loc[:, mask]
+                if self.filter_columns:
+                    # Create a regex pattern with word boundaries
+                    pattern = r'\b(' + '|'.join(re.escape(col) for col in self.filter_columns) + r')\b'
+                    
+                    # Create a boolean mask for columns that contain any of the filter_columns as whole words
+                    mask = df.columns.str.contains(pattern, regex=True)
+
+                    # Use the mask to select the desired columns
+                    df = df.loc[:, mask]
+                else:
+                    # Default behavior using TEST_LIMIT
+                    df = df.iloc[:, :TEST_LIMIT+1] # +1 is due to the Row.name column
         elif restrict_targets:
             restrict_deps = restrict_to.split(";")
             df = df[["Row.name"] + restrict_deps]
@@ -751,6 +759,12 @@ class ModelFitter:
     default=None,
     help="If restrict_targets is true, provide semicolon-separated list of dependencies",
 )
+@click.option(
+    "--filter-columns",
+    default=None,
+    type=str,
+    help="Semicolon-separated list of names to filter target columns. If not provided, uses TEST_LIMIT",
+)
 def collect_and_fit(
     input_files,
     ensemble_config,
@@ -761,6 +775,7 @@ def collect_and_fit(
     upload_to_taiga=None,
     restrict_targets=False,
     restrict_to=None,
+    filter_columns=None,
 ):
     """Run model fitting with either provided or auto-generated config."""
     save_pref = Path(save_dir) if save_dir else Path.cwd()
@@ -778,6 +793,7 @@ def collect_and_fit(
         upload_to_taiga=upload_to_taiga,
         restrict_targets=restrict_targets,
         restrict_to=restrict_to,
+        filter_columns=filter_columns,
     )
     model_fitter.run()
 
