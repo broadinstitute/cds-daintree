@@ -268,7 +268,7 @@ class ModelFitter:
         self.upload_to_taiga = upload_to_taiga
         self.restrict_targets = restrict_targets
         self.restrict_to = restrict_to
-        self.filter_columns = filter_columns.split(";") if filter_columns else None
+        self.filter_columns = filter_columns.split(",") if filter_columns else None
         self.save_pref.mkdir(parents=True, exist_ok=True)
 
     def _check_file_locs(self, ipt, config):
@@ -426,22 +426,23 @@ class ModelFitter:
                 df = df[["Row.name"] + restrict_deps]
             else:
                 if self.filter_columns:
+                    self.filter_columns.insert(0, "Row.name")
+
                     # Create a regex pattern with word boundaries
                     pattern = r'\b(' + '|'.join(re.escape(col) for col in self.filter_columns) + r')\b'
                     
                     # Create a boolean mask for columns that contain any of the filter_columns as whole words
                     mask = df.columns.str.contains(pattern, regex=True)
 
-                    # Use the mask to select the desired columns
                     df = df.loc[:, mask]
                 else:
-                    # Default behavior using TEST_LIMIT
                     df = df.iloc[:, :TEST_LIMIT+1] # +1 is due to the Row.name column
         elif restrict_targets:
             restrict_deps = restrict_to.split(";")
             df = df[["Row.name"] + restrict_deps]
 
         print("Start Processing Dependency Matrix")
+        # df.to_csv(self.save_pref / "1target_matrix_filtered.csv", index=False)
         print(df)
         print("End Processing Dependency Matrix")
         return df
@@ -763,7 +764,7 @@ class ModelFitter:
     "--filter-columns",
     default=None,
     type=str,
-    help="Semicolon-separated list of names to filter target columns. If not provided, uses TEST_LIMIT",
+    help="Comma separated list of names to filter target columns. If not provided, uses TEST_LIMIT from config.py",
 )
 def collect_and_fit(
     input_files,
@@ -800,3 +801,4 @@ def collect_and_fit(
 if __name__ == "__main__":
     print("Starting Daintree CLI Instance 1")
     cli()
+    
