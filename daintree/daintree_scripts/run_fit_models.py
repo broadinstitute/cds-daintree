@@ -504,39 +504,23 @@ class ConfigManager:
             return yaml.load(f, yaml.SafeLoader)
 
 
-class ModelFitter:
-    def __init__(self, input_files, ensemble_config, sparkles_config, 
-                 save_dir=None, test=False, skipfit=False, 
-                 upload_to_taiga=None, 
-                 restrict_targets=False, restrict_to=None,
-                 filter_columns=None):
-        self.tc = create_taiga_client_v3()
-        self.save_pref = Path(save_dir) if save_dir else Path.cwd()
-        self.input_files = input_files
-        self.ensemble_config = ensemble_config
-        self.sparkles_config = sparkles_config
-        self.test = test
-        self.skipfit = skipfit
+class TaigaUploader:
+    def __init__(self, save_pref, upload_to_taiga, config_manager):
+        self.save_pref = Path(save_pref)
         self.upload_to_taiga = upload_to_taiga
-        self.restrict_targets = restrict_targets
-        self.restrict_to = restrict_to
-        self.filter_columns = filter_columns.split(",") if filter_columns else None
-        self.save_pref.mkdir(parents=True, exist_ok=True)
-        self.data_processor = DataProcessor(self.save_pref)
-        self.config_manager = ConfigManager(self.save_pref)
+        self.config_manager = config_manager
 
-    def _check_file_locs(self, ipt, config):
-        ipt_features = list(ipt["data"].keys())
-        for model_name, model_config in config.items():
-            f_set = set(model_config.get("Features", []) + model_config.get("Required", []))
-            if model_config.get("Relation") not in ["All", "MatchTarget"]:
-                f_set.add(model_config.get("Related", ""))
-            features = list(f_set)
-            for f in features:
-                assert f in ipt_features, f"Feature {f} in model config file does not have corresponding input in {model_name}"
-
-    def _upload_results_to_taiga(self, model_name, screen_name, ipt_dict):
-        """Upload results to Taiga and create output config file."""
+    def upload_results(self, model_name, screen_name, ipt_dict):
+        """Upload results to Taiga and create output config file.
+        
+        Args:
+            model_name: Name of the model
+            screen_name: Name of the screen
+            ipt_dict: Input configuration dictionary
+            
+        Returns:
+            tuple: (feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info)
+        """
         feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
         ensemble_filename = f"Ensemble{model_name}{screen_name}.csv"
         predictions_filename = f"Predictions{model_name}{screen_name}.csv"
@@ -587,6 +571,39 @@ class ModelFitter:
         print(f"Created output config file: {output_config_file}")
 
         return feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info
+
+
+class ModelFitter:
+    def __init__(self, input_files, ensemble_config, sparkles_config, 
+                 save_dir=None, test=False, skipfit=False, 
+                 upload_to_taiga=None, 
+                 restrict_targets=False, restrict_to=None,
+                 filter_columns=None):
+        self.tc = create_taiga_client_v3()
+        self.save_pref = Path(save_dir) if save_dir else Path.cwd()
+        self.input_files = input_files
+        self.ensemble_config = ensemble_config
+        self.sparkles_config = sparkles_config
+        self.test = test
+        self.skipfit = skipfit
+        self.upload_to_taiga = upload_to_taiga
+        self.restrict_targets = restrict_targets
+        self.restrict_to = restrict_to
+        self.filter_columns = filter_columns.split(",") if filter_columns else None
+        self.save_pref.mkdir(parents=True, exist_ok=True)
+        self.data_processor = DataProcessor(self.save_pref)
+        self.config_manager = ConfigManager(self.save_pref)
+        self.taiga_uploader = TaigaUploader(self.save_pref, upload_to_taiga, self.config_manager)
+
+    def _check_file_locs(self, ipt, config):
+        ipt_features = list(ipt["data"].keys())
+        for model_name, model_config in config.items():
+            f_set = set(model_config.get("Features", []) + model_config.get("Required", []))
+            if model_config.get("Relation") not in ["All", "MatchTarget"]:
+                f_set.add(model_config.get("Related", ""))
+            features = list(f_set)
+            for f in features:
+                assert f in ipt_features, f"Feature {f} in model config file does not have corresponding input in {model_name}"
 
     def run(self):
         print("loading input files...")
@@ -720,9 +737,9 @@ class ModelFitter:
             df_predictions.to_csv(self.save_pref / predictions_filename)
 
             if self.upload_to_taiga:
-                self._upload_results_to_taiga(
-                    ipt_dict["model_name"],
-                    ipt_dict["screen_name"],
+                self.taiga_uploader.upload_results(
+                    model_name,
+                    screen_name,
                     ipt_dict
                 )
         else:
