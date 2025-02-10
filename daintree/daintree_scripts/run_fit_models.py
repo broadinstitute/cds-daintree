@@ -13,13 +13,13 @@ import time
 from taigapy import create_taiga_client_v3
 from daintree_package import main
 
-from config import TEST_LIMIT, filter_columns_gene, filter_columns_oncref
+from config import PATHS, CONTAINER, FILES, MODEL, TEST_LIMIT, filter_columns_gene, filter_columns_oncref
 from utils import calculate_feature_correlations, update_taiga
 
 # CLI Setup
 @click.group()
 def cli():
-    print("Hello, Aquib!")
+    print("Hello, World!")
     pass
 
 
@@ -184,6 +184,7 @@ class DataProcessor:
         
         assert all(os.path.exists(f) for f in partitions_df["feature_path"])
         assert all(os.path.exists(f) for f in partitions_df["predictions_path"])
+        
         return partitions_df
     
 
@@ -303,27 +304,17 @@ class DataProcessor:
         )
         
         # Save the processed matrix
-        df_dep.to_feather(self.save_pref / "target_matrix.ftr")
+        df_dep.to_feather(self.save_pref / FILES['target_matrix'])
         
         return df_dep
 
 
     def prepare_data(self, out_rel, ensemble_config):
-        """Prepare data for model fitting by processing both target (Y) and feature (X) matrices.
-        This method runs two external daintree commands:
-        1. prepare-y: Filters and processes the target matrix
-        2. prepare-x: Prepares feature matrix using the filtered targets and model config
-    
-        Args:
-            out_rel: If True, include related data in the output
-            ensemble_config: Path to the ensemble configuration file
-        """
-        #TODO This could be put in a config file
-        daintree_bin = Path("/install/depmap-py/bin/daintree") 
-        target_matrix = self.save_pref / "target_matrix.ftr"
-        target_matrix_filtered = self.save_pref / "target_matrix_filtered.ftr"
+        """Prepare data for model fitting."""
+        daintree_bin = Path(PATHS['daintree_bin'])
+        target_matrix = self.save_pref / FILES['target_matrix']
+        target_matrix_filtered = self.save_pref / FILES['target_matrix_filtered']
         
-        # Prepare target (Y) data
         print('Running "prepare-y"...')
         try:
             subprocess.check_call([
@@ -343,8 +334,8 @@ class DataProcessor:
             "prepare-x",
             "--model-config", str(ensemble_config),
             "--targets", str(target_matrix_filtered),
-            "--feature-info", str(self.save_pref / "feature_info.csv"),
-            "--output", str(self.save_pref / "X.ftr"),
+            "--feature-info", str(self.save_pref / FILES['feature_info']),
+            "--output", str(self.save_pref / FILES['feature_matrix']),
         ]
         
         if out_rel:
@@ -356,7 +347,7 @@ class DataProcessor:
             print(f"Error preparing feature data: {e}")
             raise
 
-    #TODO: Would like to add seeding in future
+    # TODO: Would like to add seeding in future
     def partition_inputs(self, dep_matrix, ensemble_config):
         """
         Divides the dependency matrix columns (genes) into chunks for parallel processing.
@@ -399,38 +390,52 @@ class DataProcessor:
         )
         
         # Save partition information to CSV file
-        param_df.to_csv(self.save_pref / "partitions.csv", index=False)
+        param_df.to_csv(self.save_pref / FILES['partitions'], index=False)
 
 
     def gather_ensemble_tasks(self, features="X.ftr", targets="target_matrix.ftr", top_n=50):
-        """Gather and process ensemble model results."""
+        """Gather and process ensemble model results, combining predictions and feature importances.
+        Args:
+            features: Path to feature matrix file (default: "X.ftr")
+            targets: Path to target matrix file (default: "target_matrix.ftr")
+            top_n: Number of top features to analyze for correlations (default: 50)
+        Returns:
+            tuple: (ensemble_df, predictions_df)
+                - ensemble_df: DataFrame with model performance and feature importance details
+                - predictions_df: DataFrame containing all model predictions
+        """
         features_df = pd.read_feather(self.save_pref / features)
         targets_df = pd.read_feather(self.save_pref / targets)
         targets_df = targets_df.set_index("Row.name")
-        partitions_df = pd.read_csv(self.save_pref / "partitions.csv")
+        partitions_df = pd.read_csv(self.save_pref / FILES['partitions'])
         partitions_df = self._prepare_partition_paths(
             partitions_df, "data", "features.csv", "predictions.csv"
         )
         
+        # Combine feature importance information from all partitions
         all_features = pd.concat(
             [pd.read_csv(f) for f in partitions_df["feature_path"]], 
             ignore_index=True
         )
         all_features.drop(["score0", "score1", "best"], axis=1, inplace=True)
         
+        # Combine predictions from all partitions
         predictions = pd.DataFrame().join(
             [pd.read_csv(f, index_col=0) for f in partitions_df["predictions_path"]], 
             how="outer"
         )
         
+        # Calculate correlations between predictions and actual values for each model
         all_cors = []
         for model in all_features["model"].unique():
             cors = self._process_model_correlations(model, partitions_df, targets_df)
             all_cors.append(cors)
         
+        # Combine correlation results and merge with feature importance data
         all_cors = pd.concat(all_cors, ignore_index=True)
         ensemble = all_features.merge(all_cors, on=["target_variable", "model"])
         
+        # Identify best performing model for each target variable
         ensemble = ensemble.copy()
         ranked_pearson = ensemble.groupby("target_variable")["pearson"].rank(ascending=False)
         ensemble["best"] = (ranked_pearson == 1)
@@ -439,24 +444,28 @@ class DataProcessor:
         
         for index, row in ensemble.iterrows():
             target_variable = row['target_variable']
-            y = targets_df[target_variable]
+            y = targets_df[target_variable]  # Actual values for this target
             
+            # Process top N(50 at this moment) features
             for i in range(top_n):
                 feature_col = f'feature{i}'
                 feature_name = row[feature_col]
                 
+                # Calculate correlation if feature exists in feature matrix
                 if feature_name in features_df.columns:
                     corr = calculate_feature_correlations(features_df[feature_name], y)
                     ensemble.loc[index, f'{feature_col}_correlation'] = corr
         
+        # Build final column list including feature information
         for i in range(top_n):
             feature_cols = [
-                f"feature{i}", 
-                f"feature{i}_importance",
-                f"feature{i}_correlation"
+                f"feature{i}",                # Feature name
+                f"feature{i}_importance",     # Feature importance score
+                f"feature{i}_correlation"     # Feature correlation with target
             ]
             ensb_cols.extend(feature_cols)
         
+        # Sort and select final columns
         ensemble = ensemble.sort_values(["target_variable", "model"])[ensb_cols]
         
         return ensemble, predictions
@@ -469,30 +478,30 @@ class SparklesRunner:
         self.related = related
         self.sparkles_config = sparkles_config
         self.dt_hash = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
-        self.sparkles_path = "/install/sparkles/bin/sparkles"
+        self.sparkles_path = PATHS['sparkles_bin']
 
     def _build_sparkles_command(self):
         base_cmd = [
             self.sparkles_path,
             "--config", self.sparkles_config,
             "sub",
-            "-i", "us.gcr.io/broad-achilles/daintree-sparkles:v1",
+            "-i", CONTAINER['image'],
             "-u", main.__file__,
-            "-u", f"{self.save_pref}/target_matrix.ftr:target.ftr",
+            "-u", f"{self.save_pref}/{FILES['target_matrix']}:target.ftr",
             "-u", f"{self.save_pref}/{self.config_fname.name}:model-config.yaml",
-            "-u", f"{self.save_pref}/X.ftr:X.ftr",
-            "-u", f"{self.save_pref}/X_feature_metadata.ftr:X_feature_metadata.ftr",
-            "-u", f"{self.save_pref}/X_valid_samples.ftr:X_valid_samples.ftr",
-            "-u", f"{self.save_pref}/partitions.csv",
-            "--params", f"{self.save_pref}/partitions.csv",
+            "-u", f"{self.save_pref}/{FILES['feature_matrix']}:X.ftr",
+            "-u", f"{self.save_pref}/{FILES['feature_metadata']}:X_feature_metadata.ftr",
+            "-u", f"{self.save_pref}/{FILES['valid_samples']}:X_valid_samples.ftr",
+            "-u", f"{self.save_pref}/{FILES['partitions']}",
+            "--params", f"{self.save_pref}/{FILES['partitions']}",
             "--skipifexists",
-            "--nodes", "100",
+            "--nodes", "100",  # This could also be moved to config maybe?
             "-n", f"ensemble_{self.dt_hash}",
-            "/install/depmap-py/bin/daintree", "fit-model",
+            PATHS['daintree_bin'], "fit-model",
             "--x", "X.ftr",
             "--y", "target.ftr",
             "--model-config", "model-config.yaml",
-            "--n-folds", "5",
+            "--n-folds", str(MODEL['n_folds']),
             "--target-range", "{start}", "{end}",
             "--model", "{model}"
         ]
@@ -533,6 +542,8 @@ class SparklesRunner:
         assert len(set(partitions["predictions_path"]) - completed_jobs) == 0, "Missing prediction files"
 
     def _process_completed_jobs(self):
+        """Process completed jobs and copy results to local directory.
+        """
         os.makedirs(f"{self.save_pref}/data", exist_ok=True)
         default_url_prefix = self._get_default_url_prefix()
         
@@ -550,6 +561,8 @@ class SparklesRunner:
         self._copy_results_to_local()
 
     def _get_default_url_prefix(self):
+        """Get the default URL prefix from the sparkles config file.
+        """
         with open(self.sparkles_config, 'r') as f:
             for line in f:
                 if 'default_url_prefix' in line:
@@ -561,7 +574,7 @@ class SparklesRunner:
             "auth", 
             "activate-service-account", 
             "--key-file", 
-            "/root/.sparkles-cache/service-keys/broad-achilles.json"
+            PATHS['service_account']
         ])
 
     def _save_completed_jobs(self, completed_jobs):
@@ -569,6 +582,8 @@ class SparklesRunner:
             f.write(completed_jobs)
 
     def _copy_results_to_local(self):
+        """Copy results from Google Cloud Storage to local directory.
+        """
         default_url_prefix = self._get_default_url_prefix()
         subprocess.check_call([
             "/google-cloud-sdk/bin/gcloud",
@@ -656,7 +671,7 @@ class ConfigManager:
             "Features": features,
             "Required": required,
             "Relation": relation,
-            "Jobs": 10
+            "Jobs": MODEL['default_jobs']  # Use config value
         }
         
         if relation == "MatchRelated":
@@ -763,7 +778,7 @@ class ConfigManager:
         return out_rel, related_dset
 
 
-    def create_output_config(self, model_name, screen_name, input_config, 
+    def create_output_config(self, input_config, 
                            feature_metadata_id, ensemble_id, prediction_matrix_id):
         """Create output configuration JSON file.
         
@@ -771,19 +786,23 @@ class ConfigManager:
             model_name: Name of the model
             screen_name: Name of the screen
             input_config: Input configuration
-            feature_metadata_id: Taiga ID for feature metadata
-            ensemble_id: Taiga ID for ensemble
-            prediction_matrix_id: Taiga ID for prediction matrix
+            feature_metadata_id: Taiga ID for feature metadata csv file
+            ensemble_id: Taiga ID for ensemble csv file
+            prediction_matrix_id: Taiga ID for prediction matrix csv file
             
         Returns:
-            dict: Output configuration dictionary
+            dict: Daintree output configuration dictionary
         """
+        model_name = input_config["model_name"]
+        screen_name = input_config["screen_name"]
+        data = input_config["data"]
+
         config = {
             model_name: {
                 "input": {
                     "model_name": model_name,
                     "screen_name": screen_name,
-                    "data": input_config["data"]
+                    "data": data
                 },
                 "output": {
                     "ensemble_taiga_id": ensemble_id,
@@ -801,17 +820,18 @@ class TaigaUploader:
         self.upload_to_taiga = upload_to_taiga
         self.config_manager = config_manager
 
-    def upload_results(self, model_name, screen_name, ipt_dict):
+    def upload_results(self, ipt_dict):
         """Upload results to Taiga and create output config file.
         
         Args:
-            model_name: Name of the model
-            screen_name: Name of the screen
             ipt_dict: Input configuration dictionary
             
         Returns:
             tuple: (feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info)
         """
+        model_name = ipt_dict["model_name"]
+        screen_name = ipt_dict["screen_name"]
+
         feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
         ensemble_filename = f"Ensemble{model_name}{screen_name}.csv"
         predictions_filename = f"Predictions{model_name}{screen_name}.csv"
@@ -844,8 +864,6 @@ class TaigaUploader:
         print(f"Predictions uploaded to Taiga: {predictions_taiga_info}")
 
         output_config = self.config_manager.create_output_config(
-            model_name=model_name,
-            screen_name=screen_name,
             input_config=ipt_dict,
             feature_metadata_id=feature_metadata_taiga_info,
             ensemble_id=ensemble_taiga_info,
@@ -854,6 +872,8 @@ class TaigaUploader:
 
         output_config_dir = self.save_pref / "output_config_files"
         output_config_dir.mkdir(parents=True, exist_ok=True)
+        # This could probably be hardcoded and put in a config file.
+        # However, I am keeping it this way for now to make it more flexible.
         output_config_filename = f"OutputConfig{model_name}{screen_name}.json"
         output_config_file = output_config_dir / output_config_filename
 
@@ -886,7 +906,7 @@ class ModelFitter:
         self.config_manager = ConfigManager(self.save_pref)
         self.taiga_uploader = TaigaUploader(self.save_pref, upload_to_taiga, self.config_manager)
         
-    def _run_model_fitting(self, ipt_dict, df_dep):
+    def _run_model_fitting(self, ipt_dict):
         """Execute model fitting if not skipped."""
         print("submitting fit jobs...")
         sparkles_runner = SparklesRunner(
@@ -900,23 +920,22 @@ class ModelFitter:
         
         model_name = ipt_dict["model_name"]
         screen_name = ipt_dict["screen_name"]
+        # This could probably be hardcoded and put in a config file. However, I am 
+        # keeping it this way for now to make it more flexible.
         ensemble_filename = f"Ensemble{model_name}{screen_name}.csv"
         predictions_filename = f"Predictions{model_name}{screen_name}.csv"
         
         df_ensemble, df_predictions = self.data_processor.gather_ensemble_tasks(
-            features=str(self.save_pref / "X.ftr"), 
-            targets=str(self.save_pref / "target_matrix.ftr"), 
-            top_n=50
+            features=str(self.save_pref / FILES['feature_matrix']), 
+            targets=str(self.save_pref / FILES['target_matrix']), 
+            top_n=MODEL['top_n_features']
         )
         df_ensemble.to_csv(self.save_pref / ensemble_filename, index=False)
         df_predictions.to_csv(self.save_pref / predictions_filename)
 
         if self.upload_to_taiga:
-            self.taiga_uploader.upload_results(
-                model_name,
-                screen_name,
-                ipt_dict
-            )
+            self.taiga_uploader.upload_results(ipt_dict)
+
 
     def run(self):
         # Load input configuration
@@ -930,14 +949,13 @@ class ModelFitter:
         print("Generating feature index and files...")
         feature_path_info = self.data_processor.generate_feature_path_info(ipt_dict)
 
-        # Determine relations
         self.out_rel, related_dset = self.config_manager.determine_relations(config_dict)
 
-        # Process feature information
         model_name = ipt_dict["model_name"]
         screen_name = ipt_dict["screen_name"]
 
-        # This could probably be hardcoded and put in a config file
+        # This could probably be hardcoded and put in a config file.
+        # However, I am keeping it this way for now to make it more flexible.
         feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
         feature_metadata_df = self.data_processor.generate_feature_metadata(
             ipt_dict, feature_path_info, related_dset, self.test
@@ -949,7 +967,7 @@ class ModelFitter:
             self.restrict_to, self.filter_columns
         )
 
-        # Save feature information
+        # Save feature matrix file path information
         feature_path_info.to_csv(self.save_pref / "feature_path_info.csv")
         feature_metadata_df.to_csv(self.save_pref / feature_metadata_filename)
 
@@ -960,7 +978,7 @@ class ModelFitter:
         self.data_processor.partition_inputs(df_dep, config_dict)
 
         if not self.skipfit:
-            self._run_model_fitting(ipt_dict, df_dep)
+            self._run_model_fitting(ipt_dict)
         else:
             print("skipping fitting and ending run")
 
@@ -1055,7 +1073,8 @@ def collect_and_fit(
     )
     model_fitter.run()
 
+
 if __name__ == "__main__":
-    print("Starting Daintree CLI Instance Iteration 2")
+    print("Starting Daintree CLI Instance Iteration 3")
     cli()
     
