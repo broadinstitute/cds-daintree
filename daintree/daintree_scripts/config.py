@@ -18,7 +18,7 @@ FILES = {
     'feature_metadata': 'X_feature_metadata.ftr',
     'valid_samples': 'X_valid_samples.ftr',
     'partitions': 'partitions.csv',
-    'feature_info': 'feature_info.csv',
+    'feature_path_info': 'feature_path_info.csv',
     'features': 'features.csv',
     'predictions': 'predictions.csv'
 }

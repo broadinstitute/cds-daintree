@@ -334,7 +334,7 @@ class DataProcessor:
             "prepare-x",
             "--model-config", str(ensemble_config),
             "--targets", str(target_matrix_filtered),
-            "--feature-info", str(self.save_pref / FILES['feature_info']),
+            "--feature-info", str(self.save_pref / FILES['feature_path_info']),
             "--output", str(self.save_pref / FILES['feature_matrix']),
         ]
         
