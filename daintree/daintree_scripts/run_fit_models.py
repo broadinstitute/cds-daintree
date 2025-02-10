@@ -18,6 +18,7 @@ from utils import calculate_feature_correlations, update_taiga
 # CLI Setup
 @click.group()
 def cli():
+    print("Hello, Aquib!")
     pass
 
 
@@ -124,6 +125,195 @@ class DataProcessor:
         
         return ensemble, predictions
     
+    def _clean_dataframe(self, df, index_col):
+        """Clean and sort the dataframe.
+        
+        Args:
+            df: Input dataframe
+            index_col: Column to use as index
+        """
+        df.sort_index(inplace=True, axis=1)
+
+        if index_col is None:
+            df.sort_values(df.columns.tolist(), inplace=True)
+        else:
+            df.sort_index(inplace=True)
+
+        return df
+
+    def _process_biomarker_matrix(self, df, index_col=0, test=False):
+        """Process biomarker matrix data.
+        
+        Args:
+            df: Input dataframe
+            index_col: Column to use as index
+            test: Whether to limit data for testing
+        """
+        df = self._clean_dataframe(df, index_col)
+
+        print("Start Processing Biomarker Matrix")
+        if test:
+            df = df.iloc[:, :]
+        print(df.head())
+        print("End Processing Biomarker Matrix")
+        return df
+
+    def _process_dep_matrix(self, df, test=False, restrict_targets=False, restrict_to=None, filter_columns=None):
+        """Process dependency matrix data.
+        
+        Args:
+            df: Input dataframe
+            test: Whether to limit data for testing
+            restrict_targets: Whether to restrict to specific targets
+            restrict_to: Target restrictions if restrict_targets is True
+        """
+        # Drop null rows and columns
+        df = df.dropna(how="all", axis=0)
+        df = df.dropna(how="all", axis=1)
+        df.index.name = "Row.name"
+        df = df.reset_index()
+
+        if test:
+            if restrict_targets:
+                print("target restriction:", restrict_to)
+                restrict_deps = restrict_to.split(";")
+                df = df[["Row.name"] + restrict_deps]
+            else:
+                if filter_columns:
+                    filter_columns.insert(0, "Row.name")
+
+                    # Create a regex pattern with word boundaries
+                    pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns) + r')\b'
+                    
+                    # Create a boolean mask for columns that contain any of the filter_columns as whole words
+                    mask = df.columns.str.contains(pattern, regex=True)
+
+                    df = df.loc[:, mask]
+                else:
+                    df = df.iloc[:, :TEST_LIMIT+1] # +1 is due to the Row.name column
+        elif restrict_targets:
+            restrict_deps = restrict_to.split(";")
+            df = df[["Row.name"] + restrict_deps]
+
+        print("Start Processing Dependency Matrix")
+        print(df)
+        print("End Processing Dependency Matrix")
+        return df
+
+    def _process_column_name(self, col, feature_dataset_name):
+        """Process column name to generate feature name, label, and ID.
+        
+        Args:
+            col: Column name to process
+            feature_dataset_name: Name of the feature dataset
+            
+        Returns:
+            tuple: (feature_name, feature_label, given_id)
+        """
+        match = re.match(r"(.+?) \((\d+)\)", col)
+        if match:
+            feature_label, given_id = match.groups()
+            feature_name = f"{feature_label.replace('-', '_')}_({given_id})_{feature_dataset_name}"
+        else:
+            feature_label = col
+            given_id = col
+            feature_name = re.sub(r'[\s-]+', '_', col) + f"_{feature_dataset_name}"
+        return feature_name, feature_label, given_id
+
+    def _partition_inputs(self, dep_matrix, ensemble_config, save_pref, out_name="partitions.csv"):
+        """Partition inputs for parallel processing.
+        
+        Args:
+            dep_matrix: Dependency matrix
+            ensemble_config: Configuration for ensemble models
+            save_pref: Save directory path
+            out_name: Output filename
+        """
+        num_genes = dep_matrix.shape[1]
+        start_indexes = []
+        end_indexes = []
+        models = []
+
+        for model_name, model_config in ensemble_config.items():
+            num_jobs = int(model_config["Jobs"])
+            start_index = np.array(range(0, num_genes, num_jobs))
+            end_index = start_index + num_jobs
+            end_index[-1] = num_genes
+            start_indexes.append(start_index)
+            end_indexes.append(end_index)
+            models.append([model_name] * len(start_index))
+
+        param_df = pd.DataFrame(
+            {
+                "start": np.concatenate(start_indexes),
+                "end": np.concatenate(end_indexes),
+                "model": np.concatenate(models),
+            }
+        )
+        param_df.to_csv(save_pref / out_name, index=False)
+
+    def _generate_config(self, input_dict, relation="All"):
+        """Generate configuration for model.
+        
+        Args:
+            input_dict: Input dictionary containing model configuration
+            relation: Relation type
+        """
+        model_name = input_dict["model_name"]
+        data = input_dict["data"]
+
+        features = [
+            key for key, value in data.items()
+            if value.get("table_type") == "feature"
+        ]
+        required = [
+            key for key, value in data.items()
+            if value.get("table_type") == "feature" and value.get("required", False)
+        ]
+        exempt = [
+            key for key, value in data.items()
+            if value.get("table_type") == "feature" and value.get("exempt", False)
+        ]
+        relation = next(
+            (value["relation"] for value in data.values() if value.get("table_type") == "target_matrix"),
+            "All"
+        )
+        model_config = {
+            "Features": features,
+            "Required": required,
+            "Relation": relation,
+            "Jobs": 10
+        }
+        
+        if relation == "MatchRelated":
+            related = next(
+                (key for key, value in data.items() if value.get("table_type") == "relation"),
+                None
+            )
+            if related:
+                model_config["Related"] = related
+        
+        if exempt:
+            model_config["Exempt"] = exempt
+
+        return {model_name: model_config}
+
+    def _generate_feature_info(self, ipt_dicts, save_pref):
+        """Generate feature information.
+        
+        Args:
+            ipt_dicts: Input dictionaries
+            save_pref: Save directory path
+        """
+        dsets = []
+        for dset_name, dset_value in ipt_dicts["data"].items():
+            if dset_value["table_type"] == "feature":
+                dsets.append(dset_name)
+        fnames = [str(save_pref / (dset + ".csv")) for dset in dsets]
+
+        df = pd.DataFrame({"dataset": dsets, "filename": fnames,})
+        return df
+
 
 class SparklesRunner:
     def __init__(self, save_pref, config_fname, related, sparkles_config):
@@ -275,6 +465,7 @@ class ModelFitter:
         self.restrict_to = restrict_to
         self.filter_columns = filter_columns.split(",") if filter_columns else None
         self.save_pref.mkdir(parents=True, exist_ok=True)
+        self.data_processor = DataProcessor(self.save_pref)
 
     def _check_file_locs(self, ipt, config):
         ipt_features = list(ipt["data"].keys())
@@ -375,102 +566,6 @@ class ModelFitter:
         print(f"Created output config file: {output_config_file}")
 
         return feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info
-
-    def _clean_dataframe(self, df, index_col):
-        """Clean and sort the dataframe.
-        
-        Args:
-            df: Input dataframe
-            index_col: Column to use as index
-        """
-        df.sort_index(inplace=True, axis=1)
-
-        if index_col is None:
-            df.sort_values(df.columns.tolist(), inplace=True)
-        else:
-            df.sort_index(inplace=True)
-
-        return df
-
-    def _process_biomarker_matrix(self, df, index_col=0, test=False):
-        """Process biomarker matrix data.
-        
-        Args:
-            df: Input dataframe
-            index_col: Column to use as index
-            test: Whether to limit data for testing
-        """
-        df = self._clean_dataframe(df, index_col)  # Use the class method instead
-
-        print("Start Processing Biomarker Matrix")
-        if test:
-            df = df.iloc[:, :]
-        print(df.head())
-        print("End Processing Biomarker Matrix")
-        return df
-
-    def _process_dep_matrix(self, df, test=False, restrict_targets=False, restrict_to=None):
-        """Process dependency matrix data.
-        
-        Args:
-            df: Input dataframe
-            test: Whether to limit data for testing
-            restrict_targets: Whether to restrict to specific targets
-            restrict_to: Target restrictions if restrict_targets is True
-        """
-        # Drop null rows and columns
-        df = df.dropna(how="all", axis=0)
-        df = df.dropna(how="all", axis=1)
-        df.index.name = "Row.name"
-        df = df.reset_index()
-
-        if test:
-            if restrict_targets:
-                print("target restriction:", restrict_to)
-                restrict_deps = restrict_to.split(";")
-                df = df[["Row.name"] + restrict_deps]
-            else:
-                if self.filter_columns:
-                    self.filter_columns.insert(0, "Row.name")
-
-                    # Create a regex pattern with word boundaries
-                    pattern = r'\b(' + '|'.join(re.escape(col) for col in self.filter_columns) + r')\b'
-                    
-                    # Create a boolean mask for columns that contain any of the filter_columns as whole words
-                    mask = df.columns.str.contains(pattern, regex=True)
-
-                    df = df.loc[:, mask]
-                else:
-                    df = df.iloc[:, :TEST_LIMIT+1] # +1 is due to the Row.name column
-        elif restrict_targets:
-            restrict_deps = restrict_to.split(";")
-            df = df[["Row.name"] + restrict_deps]
-
-        print("Start Processing Dependency Matrix")
-        # df.to_csv(self.save_pref / "1target_matrix_filtered.csv", index=False)
-        print(df)
-        print("End Processing Dependency Matrix")
-        return df
-
-    def _process_column_name(self, col, feature_dataset_name):
-        """Process column name to generate feature name, label, and ID.
-        
-        Args:
-            col: Column name to process
-            feature_dataset_name: Name of the feature dataset
-            
-        Returns:
-            tuple: (feature_name, feature_label, given_id)
-        """
-        match = re.match(r"(.+?) \((\d+)\)", col)
-        if match:
-            feature_label, given_id = match.groups()
-            feature_name = f"{feature_label.replace('-', '_')}_({given_id})_{feature_dataset_name}"
-        else:
-            feature_label = col
-            given_id = col
-            feature_name = re.sub(r'[\s-]+', '_', col) + f"_{feature_dataset_name}"
-        return feature_name, feature_label, given_id
 
     def _partition_inputs(self, dep_matrix, ensemble_config, save_pref, out_name="partitions.csv"):
         """Partition inputs for parallel processing.
@@ -573,7 +668,7 @@ class ModelFitter:
 
         # Auto-generate config if not provided
         if not self.ensemble_config:
-            config = self._generate_config(ipt_dict, relation="All")  # Updated to use class method
+            config = self._generate_config(ipt_dict, relation="All")
             model_config_name = f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
             config_path = self.save_pref / model_config_name
             
@@ -592,7 +687,7 @@ class ModelFitter:
         ), "Exactly one dataset labeled 'target_matrix' is required"
 
         print("generating feature index and files...")
-        feature_info = self._generate_feature_info(ipt_dict, self.save_pref)  # Updated to use class method
+        feature_info = self._generate_feature_info(ipt_dict, self.save_pref)
 
         print("processing relations...")
         # determine whether to provide output_related
@@ -621,12 +716,12 @@ class ModelFitter:
             if (related_dset is None) or (
                 (related_dset is not None) and dataset_name != related_dset
             ):
-                _df = self._process_biomarker_matrix(_df, 0, self.test)
+                _df = self.data_processor._process_biomarker_matrix(_df, 0, self.test)
             print(f"processed dataset: {dataset_name}")
             print(_df.head())
 
             for col in _df.columns:
-                feature_name, feature_label, given_id = self._process_column_name(col, dataset_name)
+                feature_name, feature_label, given_id = self.data_processor._process_column_name(col, dataset_name)
                 new_row = pd.DataFrame({
                     "model": [model_name],
                     "feature_name": [feature_name],
@@ -645,7 +740,7 @@ class ModelFitter:
         dep_matrix_taiga_id = next((v.get("taiga_id") for v in ipt_dict["data"].values() if v.get("table_type") == "target_matrix"), None)
         print(f"dep_matrix_taiga_id: {dep_matrix_taiga_id}")
         df_dep = self.tc.get(dep_matrix_taiga_id)
-        df_dep = self._process_dep_matrix(df_dep, self.test, self.restrict_targets, self.restrict_to)
+        df_dep = self.data_processor._process_dep_matrix(df_dep, self.test, self.restrict_targets, self.restrict_to, self.filter_columns)
         df_dep.to_feather(self.save_pref / "target_matrix.ftr")
 
         feature_info.to_csv(self.save_pref / "feature_info.csv")
@@ -681,7 +776,7 @@ class ModelFitter:
         subprocess.check_call(prep_x_cmd)
 
         print("partitioning inputs...")
-        self._partition_inputs(df_dep, config_dict, self.save_pref, out_name="partitions.csv")  # Updated to use class method
+        self._partition_inputs(df_dep, config_dict, self.save_pref, out_name="partitions.csv")
 
         if not self.skipfit:
             print("submitting fit jobs...")
@@ -804,6 +899,6 @@ def collect_and_fit(
     model_fitter.run()
 
 if __name__ == "__main__":
-    print("Starting Daintree CLI Instance 1")
+    print("Starting Daintree CLI Instance Iteration 6")
     cli()
     
