@@ -13,7 +13,6 @@ from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.metrics import r2_score, roc_auc_score
 from sklearn.model_selection import KFold, StratifiedKFold
 from typing_extensions import TypedDict
-from scipy.stats import pearsonr
 
 from .data_models import ModelConfig
 from .exceptions import MalformedGeneLabelException
@@ -342,7 +341,6 @@ class EnsembleRegressor:
         columns.append("best")
         for i in range(50):
             columns.extend(["feature%i" % i, "feature%i_importance" % i])
-        columns.extend(["feature%i_correlation" % i for i in range(50)])
 
         melted = pd.DataFrame(columns=columns)
         for target_variable in self.trained_models.keys():
