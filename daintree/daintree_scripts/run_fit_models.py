@@ -1,153 +1,25 @@
-import json
-import pandas as pd
-from taigapy import create_taiga_client_v3
-import datetime as dt
-import yaml
-import subprocess
 import os
-from pathlib import Path
+import subprocess
 import click
 import re
+import json
+import yaml
 import numpy as np
+import pandas as pd
+import datetime as dt
+from pathlib import Path
+
+from taigapy import create_taiga_client_v3
+from daintree_package import main
 
 from config import TEST_LIMIT, filter_columns_gene, filter_columns_oncref
 from utils import calculate_feature_correlations, update_taiga
-from daintree_package import main
 
-
+# CLI Setup
 @click.group()
 def cli():
     pass
 
-class SparklesRunner:
-    def __init__(self, save_pref, config_fname, related, sparkles_config):
-        self.save_pref = Path(save_pref)
-        self.config_fname = Path(config_fname)
-        self.related = related
-        self.sparkles_config = sparkles_config
-        self.dt_hash = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
-        self.sparkles_path = "/install/sparkles/bin/sparkles"
-
-    def _build_sparkles_command(self):
-        base_cmd = [
-            self.sparkles_path,
-            "--config", self.sparkles_config,
-            "sub",
-            "-i", "us.gcr.io/broad-achilles/daintree-sparkles:v1",
-            "-u", main.__file__,
-            "-u", f"{self.save_pref}/target_matrix.ftr:target.ftr",
-            "-u", f"{self.save_pref}/{self.config_fname.name}:model-config.yaml",
-            "-u", f"{self.save_pref}/X.ftr:X.ftr",
-            "-u", f"{self.save_pref}/X_feature_metadata.ftr:X_feature_metadata.ftr",
-            "-u", f"{self.save_pref}/X_valid_samples.ftr:X_valid_samples.ftr",
-            "-u", f"{self.save_pref}/partitions.csv",
-            "--params", f"{self.save_pref}/partitions.csv",
-            "--skipifexists",
-            "--nodes", "100",
-            "-n", f"ensemble_{self.dt_hash}",
-            "/install/depmap-py/bin/daintree", "fit-model",
-            "--x", "X.ftr",
-            "--y", "target.ftr",
-            "--model-config", "model-config.yaml",
-            "--n-folds", "5",
-            "--target-range", "{start}", "{end}",
-            "--model", "{model}"
-        ]
-        
-        if self.related:
-            base_cmd.extend([
-                "-u", f"{self.save_pref}/related.ftr:related.ftr",
-                "--related-table", "related.ftr"
-            ])
-        return base_cmd
-
-    def run(self):
-        cmd = self._build_sparkles_command()
-        print(f"Running sparkles with command: {cmd}")
-        subprocess.check_call(cmd)
-        print("sparkles run complete")
-        return self.dt_hash
-
-    def validate(self):
-        print("Validating sparkles run...")
-        self._watch_jobs()
-        self._reset_jobs()
-        self._watch_jobs()
-        self._process_completed_jobs()
-
-    def _watch_jobs(self):
-        subprocess.check_call([self.sparkles_path, "--config", self.sparkles_config, 
-                             "watch", f"ensemble_{self.dt_hash}", "--loglive"])
-
-    def _reset_jobs(self):
-        subprocess.check_call([self.sparkles_path, "--config", self.sparkles_config, 
-                             "reset", f"ensemble_{self.dt_hash}"])
-
-    def _validate_jobs_complete(self):
-        """Validate that all expected job outputs exist"""
-        with open(f"{self.save_pref}/completed_jobs.txt") as f:
-            completed_jobs = {l.split("/")[-1].strip() for l in f.readlines()}
-
-        partitions = pd.read_csv(f"{self.save_pref}/partitions.csv")
-        partitions["path_prefix"] = (
-            partitions["model"]
-            + "_"
-            + partitions["start"].map(str)
-            + "_"
-            + partitions["end"].map(str)
-            + "_"
-        )
-        partitions["feature_path"] = partitions["path_prefix"] + "features.csv"
-        partitions["predictions_path"] = partitions["path_prefix"] + "predictions.csv"
-
-        assert len(set(partitions["feature_path"]) - completed_jobs) == 0, "Missing feature files"
-        assert len(set(partitions["predictions_path"]) - completed_jobs) == 0, "Missing prediction files"
-
-    def _process_completed_jobs(self):
-        os.makedirs(f"{self.save_pref}/data", exist_ok=True)
-        default_url_prefix = self._get_default_url_prefix()
-        
-        self._authenticate_gcloud()
-        
-        completed_jobs = subprocess.check_output([
-            "/google-cloud-sdk/bin/gcloud", 
-            "storage", 
-            "ls", 
-            f"{default_url_prefix}/ensemble_{self.dt_hash}/*/*.csv"
-        ]).decode()
-        
-        self._save_completed_jobs(completed_jobs)
-        self._validate_jobs_complete()
-        self._copy_results_to_local()
-
-    def _get_default_url_prefix(self):
-        with open(self.sparkles_config, 'r') as f:
-            for line in f:
-                if 'default_url_prefix' in line:
-                    return line.split('=')[1].strip()
-
-    def _authenticate_gcloud(self):
-        subprocess.check_call([
-            "/google-cloud-sdk/bin/gcloud", 
-            "auth", 
-            "activate-service-account", 
-            "--key-file", 
-            "/root/.sparkles-cache/service-keys/broad-achilles.json"
-        ])
-
-    def _save_completed_jobs(self, completed_jobs):
-        with open(f"{self.save_pref}/completed_jobs.txt", 'w') as f:
-            f.write(completed_jobs)
-
-    def _copy_results_to_local(self):
-        default_url_prefix = self._get_default_url_prefix()
-        subprocess.check_call([
-            "/google-cloud-sdk/bin/gcloud",
-            "storage",
-            "cp",
-            f"{default_url_prefix}/ensemble_{self.dt_hash}/*/*.csv",
-            f"{self.save_pref}/data"
-        ])
 
 class DataProcessor:
     def __init__(self, save_pref):
@@ -251,6 +123,139 @@ class DataProcessor:
         ensemble = ensemble.sort_values(["target_variable", "model"])[ensb_cols]
         
         return ensemble, predictions
+    
+
+class SparklesRunner:
+    def __init__(self, save_pref, config_fname, related, sparkles_config):
+        self.save_pref = Path(save_pref)
+        self.config_fname = Path(config_fname)
+        self.related = related
+        self.sparkles_config = sparkles_config
+        self.dt_hash = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
+        self.sparkles_path = "/install/sparkles/bin/sparkles"
+
+    def _build_sparkles_command(self):
+        base_cmd = [
+            self.sparkles_path,
+            "--config", self.sparkles_config,
+            "sub",
+            "-i", "us.gcr.io/broad-achilles/daintree-sparkles:v1",
+            "-u", main.__file__,
+            "-u", f"{self.save_pref}/target_matrix.ftr:target.ftr",
+            "-u", f"{self.save_pref}/{self.config_fname.name}:model-config.yaml",
+            "-u", f"{self.save_pref}/X.ftr:X.ftr",
+            "-u", f"{self.save_pref}/X_feature_metadata.ftr:X_feature_metadata.ftr",
+            "-u", f"{self.save_pref}/X_valid_samples.ftr:X_valid_samples.ftr",
+            "-u", f"{self.save_pref}/partitions.csv",
+            "--params", f"{self.save_pref}/partitions.csv",
+            "--skipifexists",
+            "--nodes", "100",
+            "-n", f"ensemble_{self.dt_hash}",
+            "/install/depmap-py/bin/daintree", "fit-model",
+            "--x", "X.ftr",
+            "--y", "target.ftr",
+            "--model-config", "model-config.yaml",
+            "--n-folds", "5",
+            "--target-range", "{start}", "{end}",
+            "--model", "{model}"
+        ]
+        
+        if self.related:
+            base_cmd.extend([
+                "-u", f"{self.save_pref}/related.ftr:related.ftr",
+                "--related-table", "related.ftr"
+            ])
+        return base_cmd
+
+
+    def _watch_jobs(self):
+        subprocess.check_call([self.sparkles_path, "--config", self.sparkles_config, 
+                             "watch", f"ensemble_{self.dt_hash}", "--loglive"])
+
+    def _reset_jobs(self):
+        subprocess.check_call([self.sparkles_path, "--config", self.sparkles_config, 
+                             "reset", f"ensemble_{self.dt_hash}"])
+
+    def _validate_jobs_complete(self):
+        """Validate that all expected job outputs exist"""
+        with open(f"{self.save_pref}/completed_jobs.txt") as f:
+            completed_jobs = {l.split("/")[-1].strip() for l in f.readlines()}
+
+        partitions = pd.read_csv(f"{self.save_pref}/partitions.csv")
+        partitions["path_prefix"] = (
+            partitions["model"]
+            + "_"
+            + partitions["start"].map(str)
+            + "_"
+            + partitions["end"].map(str)
+            + "_"
+        )
+        partitions["feature_path"] = partitions["path_prefix"] + "features.csv"
+        partitions["predictions_path"] = partitions["path_prefix"] + "predictions.csv"
+
+        assert len(set(partitions["feature_path"]) - completed_jobs) == 0, "Missing feature files"
+        assert len(set(partitions["predictions_path"]) - completed_jobs) == 0, "Missing prediction files"
+
+    def _process_completed_jobs(self):
+        os.makedirs(f"{self.save_pref}/data", exist_ok=True)
+        default_url_prefix = self._get_default_url_prefix()
+        
+        self._authenticate_gcloud()
+        
+        completed_jobs = subprocess.check_output([
+            "/google-cloud-sdk/bin/gcloud", 
+            "storage", 
+            "ls", 
+            f"{default_url_prefix}/ensemble_{self.dt_hash}/*/*.csv"
+        ]).decode()
+        
+        self._save_completed_jobs(completed_jobs)
+        self._validate_jobs_complete()
+        self._copy_results_to_local()
+
+    def _get_default_url_prefix(self):
+        with open(self.sparkles_config, 'r') as f:
+            for line in f:
+                if 'default_url_prefix' in line:
+                    return line.split('=')[1].strip()
+
+    def _authenticate_gcloud(self):
+        subprocess.check_call([
+            "/google-cloud-sdk/bin/gcloud", 
+            "auth", 
+            "activate-service-account", 
+            "--key-file", 
+            "/root/.sparkles-cache/service-keys/broad-achilles.json"
+        ])
+
+    def _save_completed_jobs(self, completed_jobs):
+        with open(f"{self.save_pref}/completed_jobs.txt", 'w') as f:
+            f.write(completed_jobs)
+
+    def _copy_results_to_local(self):
+        default_url_prefix = self._get_default_url_prefix()
+        subprocess.check_call([
+            "/google-cloud-sdk/bin/gcloud",
+            "storage",
+            "cp",
+            f"{default_url_prefix}/ensemble_{self.dt_hash}/*/*.csv",
+            f"{self.save_pref}/data"
+        ])
+    
+    def run(self):
+        cmd = self._build_sparkles_command()
+        print(f"Running sparkles with command: {cmd}")
+        subprocess.check_call(cmd)
+        print("sparkles run complete")
+        return self.dt_hash
+
+    def validate(self):
+        print("Validating sparkles run...")
+        self._watch_jobs()
+        self._reset_jobs()
+        self._watch_jobs()
+        self._process_completed_jobs()
+
 
 class ModelFitter:
     def __init__(self, input_files, ensemble_config, sparkles_config, 
