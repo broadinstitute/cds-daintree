@@ -689,16 +689,16 @@ class ConfigManager:
                 assert f in ipt_features, f"Feature {f} in model config file does not have corresponding input in {model_name}"
 
 
-    def load_input_config(self, input_files):
+    def load_input_config(self, input_config):
         """Load and validate input configuration.
         Args:
-            input_files: Path to input configuration file
+            input_config: Path to input configuration file
             
         Returns:
             dict: Validated configuration dictionary
         """
         print("Loading input json file...")
-        with open(input_files, "r") as f:
+        with open(input_config, "r") as f:
             config = json.load(f)
         
         assert "model_name" in config, "Config missing required field 'model_name'"
@@ -870,11 +870,11 @@ class TaigaUploader:
 
 
 class ModelFitter:
-    def __init__(self, input_files, ensemble_config, sparkles_config, 
-                 save_dir=None, test=False, skipfit=False, 
+    def __init__(self, input_config, ensemble_config, sparkles_config, 
+                 out=None, test=False, skipfit=False, 
                  upload_to_taiga=None, restrict_targets_to=None):
-        self.save_pref = Path(save_dir) if save_dir else Path.cwd()
-        self.input_files = input_files
+        self.save_pref = Path(out) if out else Path.cwd()
+        self.input_config = input_config
         self.ensemble_config = ensemble_config
         self.sparkles_config = sparkles_config
         self.test = test
@@ -920,7 +920,7 @@ class ModelFitter:
 
     def run(self):
         # Load input configuration
-        ipt_dict = self.config_manager.load_input_config(self.input_files)
+        ipt_dict = self.config_manager.load_input_config(self.input_config)
 
         # Setup and validate ensemble configuration
         self.ensemble_config, config_dict = self.config_manager.setup_ensemble_config(
@@ -965,9 +965,9 @@ class ModelFitter:
 
 @cli.command()
 @click.option(
-    "--input-files",
+    "--input-config",
     required=True,
-    help="JSON file containing the set of files for prediction",
+    help="Path to JSON config file containing the set of files for prediction",
 )
 @click.option(
     "--ensemble-config",
@@ -977,10 +977,10 @@ class ModelFitter:
 @click.option(
     "--sparkles-config", 
     required=True, 
-    help="path to the sparkles config file to use"
+    help="Path to the sparkles config file to use"
 )
 @click.option(
-    "--save-dir",
+    "--out",
     required=False,
     help="Path to where the data should be stored if not the same directory as the script",
 )
@@ -1009,26 +1009,26 @@ class ModelFitter:
     help="Comma separated list of names to filter target columns. If not provided, uses TEST_LIMIT from config.py",
 )
 def collect_and_fit(
-    input_files,
+    input_config,
     ensemble_config,
     sparkles_config,
-    save_dir=None,
+    out=None,
     test=False,
     skipfit=False,
     upload_to_taiga=None,
     restrict_targets_to=None,
 ):
     """Run model fitting with either provided or auto-generated config."""
-    save_pref = Path(save_dir) if save_dir else Path.cwd()
+    save_pref = Path(out) if out else Path.cwd()
     print(f"Save directory path: {save_pref}")
     save_pref.mkdir(parents=True, exist_ok=True)
 
     # Run the model fitting
     model_fitter = ModelFitter(
-        input_files,
+        input_config,
         ensemble_config,
         sparkles_config,
-        save_dir=str(save_pref),
+        out=str(save_pref),
         test=test,
         skipfit=skipfit,
         upload_to_taiga=upload_to_taiga,
