@@ -102,12 +102,12 @@ class DataProcessor:
         return df
     
 
-    def _process_dep_matrix(self, df, test=False, filter_columns=None):
+    def _process_dep_matrix(self, df, test=False, restrict_targets_to=None):
         """Process dependency matrix data.
         Args:
             df: Dependency matrix dataframe
             test: Test flag
-            filter_columns: List of column names to filter the target matrix by
+            restrict_targets_to: Comma Separated list of targets to restrict the matrix to
         Returns:
             pd.DataFrame: Processed dependency matrix
         """
@@ -119,9 +119,9 @@ class DataProcessor:
 
         if test:
             # If no specific targets, apply column filtering
-            if filter_columns:
-                filter_columns.insert(0, "Row.name")
-                pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns) + r')\b'
+            if restrict_targets_to:
+                restrict_targets_to.insert(0, "Row.name")
+                pattern = r'\b(' + '|'.join(re.escape(col) for col in restrict_targets_to) + r')\b'
                 mask = df.columns.str.contains(pattern, regex=True)
                 df = df.loc[:, mask]
             else:
@@ -260,13 +260,13 @@ class DataProcessor:
         return feature_metadata_df
 
 
-    def process_dependency_data(self, ipt_dict, test=False, filter_columns=None):
+    def process_dependency_data(self, ipt_dict, test=False, restrict_targets_to=None):
         """Process dependency matrix data from Taiga and prepare it for model training.
         
         Args:
             ipt_dict: Dictionary containing input configuration with dataset metadata
             test: If True, limits data size for testing purposes
-            filter_columns: List of column names to filter the target matrix by
+            restrict_targets_to: List of column names to filter the target matrix by
         
         Returns:
             pd.DataFrame: Processed dependency matrix ready for model training
@@ -284,7 +284,7 @@ class DataProcessor:
         df_dep = self.tc.get(dep_matrix_taiga_id)
         
         df_dep = self._process_dep_matrix(
-            df_dep, test, filter_columns=filter_columns
+            df_dep, test, restrict_targets_to=restrict_targets_to
         )
         
         # Save the processed matrix
@@ -872,7 +872,7 @@ class TaigaUploader:
 class ModelFitter:
     def __init__(self, input_files, ensemble_config, sparkles_config, 
                  save_dir=None, test=False, skipfit=False, 
-                 upload_to_taiga=None, filter_columns=None):
+                 upload_to_taiga=None, restrict_targets_to=None):
         self.save_pref = Path(save_dir) if save_dir else Path.cwd()
         self.input_files = input_files
         self.ensemble_config = ensemble_config
@@ -880,7 +880,7 @@ class ModelFitter:
         self.test = test
         self.skipfit = skipfit
         self.upload_to_taiga = upload_to_taiga
-        self.filter_columns = filter_columns.split(",") if filter_columns else None
+        self.restrict_targets_to = restrict_targets_to.split(",") if restrict_targets_to else None
         self.save_pref.mkdir(parents=True, exist_ok=True)
         
         self.data_processor = DataProcessor(self.save_pref)
@@ -944,7 +944,7 @@ class ModelFitter:
 
         # Process dependency data
         df_dep = self.data_processor.process_dependency_data(
-            ipt_dict, self.test, filter_columns=self.filter_columns
+            ipt_dict, self.test, restrict_targets_to=self.restrict_targets_to
         )
 
         # Save feature matrix file path information
@@ -1003,7 +1003,7 @@ class ModelFitter:
     help="Upload results to Taiga",
 )
 @click.option(
-    "--filter-columns",
+    "--restrict-targets-to",
     default=None,
     type=str,
     help="Comma separated list of names to filter target columns. If not provided, uses TEST_LIMIT from config.py",
@@ -1016,7 +1016,7 @@ def collect_and_fit(
     test=False,
     skipfit=False,
     upload_to_taiga=None,
-    filter_columns=None,
+    restrict_targets_to=None,
 ):
     """Run model fitting with either provided or auto-generated config."""
     save_pref = Path(save_dir) if save_dir else Path.cwd()
@@ -1032,7 +1032,7 @@ def collect_and_fit(
         test=test,
         skipfit=skipfit,
         upload_to_taiga=upload_to_taiga,
-        filter_columns=filter_columns,
+        restrict_targets_to=restrict_targets_to,
     )
     model_fitter.run()
     print("My journey in Daintree has finished.")
