@@ -24,8 +24,6 @@ RUN mkdir -p /daintree
 WORKDIR /daintree
 
 COPY daintree_scripts/ /daintree/daintree_scripts/
-COPY daintree_scripts/run_fit_models.py /install/depmap-py/bin/daintree-fit
-RUN chmod +x /install/depmap-py/bin/daintree-fit
 
 # Remove in Future. Only used for testing in local environment.
 COPY token /root/.taiga/token
