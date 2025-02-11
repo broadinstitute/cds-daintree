@@ -488,7 +488,7 @@ class SparklesRunner:
             "--skipifexists",
             "--nodes", "100",  # This could also be moved to config maybe?
             "-n", f"ensemble_{self.dt_hash}",
-            PATHS['daintree_bin'], "fit-model",
+            PATHS['daintree_bin'], "fit-model", # TODO: This is essentially replacing cds-ensemble fit-model
             "--x", "X.ftr",
             "--y", "target.ftr",
             "--model-config", "model-config.yaml",
