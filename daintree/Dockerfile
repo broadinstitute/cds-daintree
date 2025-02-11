@@ -24,9 +24,12 @@ RUN mkdir -p /daintree
 WORKDIR /daintree
 
 COPY daintree_scripts/ /daintree/daintree_scripts/
+COPY daintree_scripts/run_fit_models.py /install/depmap-py/bin/daintree-fit
+RUN chmod +x /install/depmap-py/bin/daintree-fit
 
 # Remove in Future. Only used for testing in local environment.
 COPY token /root/.taiga/token
 COPY broad-achilles.json /root/.sparkles-cache/service-keys/broad-achilles.json
-COPY model-map.json /daintree/model-map.json
-COPY sparkles-config /daintree/sparkles-config
+
+# Set the entrypoint to run the Python script
+ENTRYPOINT ["/install/depmap-py/bin/python3.9", "-u", "/daintree/daintree_scripts/run_fit_models.py"]

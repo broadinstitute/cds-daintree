@@ -19,7 +19,7 @@ from utils import calculate_feature_correlations, update_taiga
 # CLI Setup
 @click.group()
 def cli():
-    print("Hello, World! Here I start my journey in Daintree.")
+    print("\033[96mHello, World! Here I start my journey in Daintree.\033[0m")  # Teal
     pass
 
 
@@ -96,7 +96,6 @@ class DataProcessor:
         df = self._clean_dataframe(df, index_col)
         # if test:
         #     df = df.iloc[:, :TEST_LIMIT]
-        print(df.head())
         print("End Processing Biomarker Matrix")
 
         return df
@@ -118,6 +117,7 @@ class DataProcessor:
         df = df.reset_index()
 
         if test:
+            print("\033[93mWarning: Truncating datasets for testing...\033[0m") # Yellow
             # If no specific targets, apply column filtering
             if restrict_targets_to:
                 restrict_targets_to.insert(0, "Row.name")
@@ -128,8 +128,9 @@ class DataProcessor:
                 # If no filter columns provided, take first TEST_LIMIT+1 columns
                 # (+1 because first column is Row.name)
                 df = df.iloc[:, :TEST_LIMIT+1]
-
-        print(df.head())
+        else:
+            print("\033[93mWarning: Not truncating datasets. This may take a while...\033[0m") # Yellow
+            
         print("End Processing Dependency Matrix")
 
         return df
@@ -213,7 +214,9 @@ class DataProcessor:
             (related_dset is not None) and dataset_name != related_dset
         ):
             _df = self._process_biomarker_matrix(_df, 0, test)
-        print(f"Processed dataset: {dataset_name}")
+        print("\033[92m================================================") # Green
+        print(f"Processed Feature Dataset: {dataset_name}")
+        print("================================================\033[0m")  
         print(_df.head())
 
         for col in _df.columns:
@@ -242,9 +245,6 @@ class DataProcessor:
         """
         print("Generating feature metadata...")
         feature_metadata_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_type"])
-
-        if test:
-            print("and truncating datasets for testing...")
 
         model_name = ipt_dict["model_name"]
         for dataset_name, dataset_metadata in ipt_dict["data"].items():
@@ -287,7 +287,13 @@ class DataProcessor:
             df_dep, test, restrict_targets_to=restrict_targets_to
         )
         
+        print("\033[92m================================================") # Green
+        print(f"Processed Target Matrix")
+        print("================================================\033[0m")
+        print(df_dep.head())
+
         # Save the processed matrix
+        df_dep.to_csv(self.save_pref / FILES['target_matrix'])
         df_dep.to_feather(self.save_pref / FILES['target_matrix'])
         
         return df_dep
@@ -582,7 +588,7 @@ class SparklesRunner:
         cmd = self._build_sparkles_command()
         print(f"Running sparkles with command: {cmd}")
         subprocess.check_call(cmd)
-        print("sparkles run complete")
+        print("Sparkles run complete")
         return self.dt_hash
 
     def validate(self):
@@ -889,7 +895,7 @@ class ModelFitter:
         
     def _run_model_fitting(self, ipt_dict):
         """Execute model fitting if not skipped."""
-        print("submitting fit jobs...")
+        print("Submitting fit jobs...")
         sparkles_runner = SparklesRunner(
             self.save_pref, 
             self.ensemble_config, 
@@ -1035,7 +1041,7 @@ def collect_and_fit(
         restrict_targets_to=restrict_targets_to,
     )
     model_fitter.run()
-    print("My journey in Daintree has finished.")
+    print("\033[96mMy journey in Daintree has finished.\033[0m")  # Teal
 
 
 if __name__ == "__main__":
