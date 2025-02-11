@@ -19,7 +19,7 @@ from utils import calculate_feature_correlations, update_taiga
 # CLI Setup
 @click.group()
 def cli():
-    print("Hello, World!")
+    print("Hello, World! Here I start my journey in Daintree.")
     pass
 
 
@@ -101,7 +101,7 @@ class DataProcessor:
 
         return df
     
-    # TODO: restrict_targets, restrict_to, filter_columns are trying to accomplish the same thing
+    # TODO: restrict_targets and restrict_to or filter_columns are trying to accomplish the same thing
     # Remove either filter_columns or restrcit_targets, restrict_to in future
     def _process_dep_matrix(self, df, test=False, restrict_targets=False, restrict_to=None, filter_columns=None):
         """Process dependency matrix data.
@@ -280,7 +280,7 @@ class DataProcessor:
             ipt_dict: Dictionary containing input configuration with dataset metadata
             test: If True, limits data size for testing purposes
             restrict_targets: If True, filters matrix to only specified target columns
-            restrict_to: Semicolon-separated string of target names to keep (used if restrict_targets=True)
+            restrict_to: Comma-separated string of target names to keep (used if restrict_targets=True)
             filter_columns: List of column names to filter the target matrix by
         
         Returns:
@@ -315,6 +315,7 @@ class DataProcessor:
         target_matrix = self.save_pref / FILES['target_matrix']
         target_matrix_filtered = self.save_pref / FILES['target_matrix_filtered']
         
+        # Note that these parameters are from daintree_package or cds-ensemble
         print('Running "prepare-y"...')
         try:
             subprocess.check_call([
@@ -327,7 +328,7 @@ class DataProcessor:
             print(f"Error preparing target data: {e}")
             raise
 
-        # Prepare feature (X) data
+        # Note that these parameters are from daintree_package or cds-ensemble
         print('Running "prepare-x"...')
         prep_x_cmd = [
             str(daintree_bin),
@@ -1033,7 +1034,7 @@ class ModelFitter:
     required=False,
     type=str,
     default=None,
-    help="If restrict_targets is true, provide semicolon-separated list of dependencies",
+    help="If restrict_targets is true, provide comma-separated list of dependencies",
 )
 @click.option(
     "--filter-columns",
@@ -1072,9 +1073,9 @@ def collect_and_fit(
         filter_columns=filter_columns,
     )
     model_fitter.run()
+    print("My journey in Daintree is complete.")
 
 
 if __name__ == "__main__":
-    print("Starting Daintree CLI Instance Iteration 3")
     cli()
     
