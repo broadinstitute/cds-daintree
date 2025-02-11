@@ -19,7 +19,7 @@ from utils import calculate_feature_correlations, update_taiga
 # CLI Setup
 @click.group()
 def cli():
-    print("Hello, World!")
+    print("\033[96mHello, World! Here I start my journey in Daintree.\033[0m")  # Teal
     pass
 
 
@@ -96,21 +96,17 @@ class DataProcessor:
         df = self._clean_dataframe(df, index_col)
         # if test:
         #     df = df.iloc[:, :TEST_LIMIT]
-        print(df.head())
         print("End Processing Biomarker Matrix")
 
         return df
     
-    # TODO: restrict_targets, restrict_to, filter_columns are trying to accomplish the same thing
-    # Remove either filter_columns or restrcit_targets, restrict_to in future
-    def _process_dep_matrix(self, df, test=False, restrict_targets=False, restrict_to=None, filter_columns=None):
+
+    def _process_dep_matrix(self, df, test=False, restrict_targets_to=None):
         """Process dependency matrix data.
         Args:
             df: Dependency matrix dataframe
             test: Test flag
-            restrict_targets: If True, filters matrix to only specified target columns
-            restrict_to: If restrict_targets is True, restrict to dependencies mentioned
-            filter_columns: List of column names to filter the target matrix by
+            restrict_targets_to: Comma Separated list of targets to restrict the matrix to
         Returns:
             pd.DataFrame: Processed dependency matrix
         """
@@ -121,27 +117,20 @@ class DataProcessor:
         df = df.reset_index()
 
         if test:
-            if restrict_targets:
-                print("target restriction:", restrict_to)
-                restrict_deps = restrict_to.split(",")
-                df = df[["Row.name"] + restrict_deps]  # Keep Row.name and specified targets
+            print("\033[93mWarning: Truncating datasets for testing...\033[0m") # Yellow
+            # If no specific targets, apply column filtering
+            if restrict_targets_to:
+                restrict_targets_to.insert(0, "Row.name")
+                pattern = r'\b(' + '|'.join(re.escape(col) for col in restrict_targets_to) + r')\b'
+                mask = df.columns.str.contains(pattern, regex=True)
+                df = df.loc[:, mask]
             else:
-                # If no specific targets, apply column filtering
-                if filter_columns:
-                    filter_columns.insert(0, "Row.name")
-                    pattern = r'\b(' + '|'.join(re.escape(col) for col in filter_columns) + r')\b'
-                    mask = df.columns.str.contains(pattern, regex=True)
-                    df = df.loc[:, mask]
-                else:
-                    # If no filter columns provided, take first TEST_LIMIT+1 columns
-                    # (+1 because first column is Row.name)
-                    df = df.iloc[:, :TEST_LIMIT+1]
-        elif restrict_targets:
-            # If restrict targets is true, restrict the dataframe to the provided dependencies
-            restrict_deps = restrict_to.split(",")
-            df = df[["Row.name"] + restrict_deps]
-
-        print(df.head())
+                # If no filter columns provided, take first TEST_LIMIT+1 columns
+                # (+1 because first column is Row.name)
+                df = df.iloc[:, :TEST_LIMIT+1]
+        else:
+            print("\033[93mWarning: Not truncating datasets. This may take a while...\033[0m") # Yellow
+            
         print("End Processing Dependency Matrix")
 
         return df
@@ -225,7 +214,9 @@ class DataProcessor:
             (related_dset is not None) and dataset_name != related_dset
         ):
             _df = self._process_biomarker_matrix(_df, 0, test)
-        print(f"Processing dataset: {dataset_name}")
+        print("\033[92m================================================") # Green
+        print(f"Processed Feature Dataset: {dataset_name}")
+        print("================================================\033[0m")  
         print(_df.head())
 
         for col in _df.columns:
@@ -255,9 +246,6 @@ class DataProcessor:
         print("Generating feature metadata...")
         feature_metadata_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_type"])
 
-        if test:
-            print("and truncating datasets for testing...")
-
         model_name = ipt_dict["model_name"]
         for dataset_name, dataset_metadata in ipt_dict["data"].items():
             if dataset_metadata["table_type"] not in ["feature", "relation"]:
@@ -272,16 +260,13 @@ class DataProcessor:
         return feature_metadata_df
 
 
-    def process_dependency_data(self, ipt_dict, test=False, restrict_targets=False, 
-                              restrict_to=None, filter_columns=None):
+    def process_dependency_data(self, ipt_dict, test=False, restrict_targets_to=None):
         """Process dependency matrix data from Taiga and prepare it for model training.
         
         Args:
             ipt_dict: Dictionary containing input configuration with dataset metadata
             test: If True, limits data size for testing purposes
-            restrict_targets: If True, filters matrix to only specified target columns
-            restrict_to: Semicolon-separated string of target names to keep (used if restrict_targets=True)
-            filter_columns: List of column names to filter the target matrix by
+            restrict_targets_to: List of column names to filter the target matrix by
         
         Returns:
             pd.DataFrame: Processed dependency matrix ready for model training
@@ -299,11 +284,16 @@ class DataProcessor:
         df_dep = self.tc.get(dep_matrix_taiga_id)
         
         df_dep = self._process_dep_matrix(
-            df_dep, test, restrict_targets, 
-            restrict_to, filter_columns
+            df_dep, test, restrict_targets_to=restrict_targets_to
         )
         
+        print("\033[92m================================================") # Green
+        print(f"Processed Target Matrix")
+        print("================================================\033[0m")
+        print(df_dep.head())
+
         # Save the processed matrix
+        df_dep.to_csv(self.save_pref / FILES['target_matrix'])
         df_dep.to_feather(self.save_pref / FILES['target_matrix'])
         
         return df_dep
@@ -315,6 +305,7 @@ class DataProcessor:
         target_matrix = self.save_pref / FILES['target_matrix']
         target_matrix_filtered = self.save_pref / FILES['target_matrix_filtered']
         
+        # Note that these parameters are from daintree_package or cds-ensemble
         print('Running "prepare-y"...')
         try:
             subprocess.check_call([
@@ -327,7 +318,7 @@ class DataProcessor:
             print(f"Error preparing target data: {e}")
             raise
 
-        # Prepare feature (X) data
+        # Note that these parameters are from daintree_package or cds-ensemble
         print('Running "prepare-x"...')
         prep_x_cmd = [
             str(daintree_bin),
@@ -597,7 +588,7 @@ class SparklesRunner:
         cmd = self._build_sparkles_command()
         print(f"Running sparkles with command: {cmd}")
         subprocess.check_call(cmd)
-        print("sparkles run complete")
+        print("Sparkles run complete")
         return self.dt_hash
 
     def validate(self):
@@ -704,16 +695,16 @@ class ConfigManager:
                 assert f in ipt_features, f"Feature {f} in model config file does not have corresponding input in {model_name}"
 
 
-    def load_input_config(self, input_files):
+    def load_input_config(self, input_config):
         """Load and validate input configuration.
         Args:
-            input_files: Path to input configuration file
+            input_config: Path to input configuration file
             
         Returns:
             dict: Validated configuration dictionary
         """
         print("Loading input json file...")
-        with open(input_files, "r") as f:
+        with open(input_config, "r") as f:
             config = json.load(f)
         
         assert "model_name" in config, "Config missing required field 'model_name'"
@@ -885,21 +876,17 @@ class TaigaUploader:
 
 
 class ModelFitter:
-    def __init__(self, input_files, ensemble_config, sparkles_config, 
-                 save_dir=None, test=False, skipfit=False, 
-                 upload_to_taiga=None, 
-                 restrict_targets=False, restrict_to=None,
-                 filter_columns=None):
-        self.save_pref = Path(save_dir) if save_dir else Path.cwd()
-        self.input_files = input_files
+    def __init__(self, input_config, ensemble_config, sparkles_config, 
+                 out=None, test=False, skipfit=False, 
+                 upload_to_taiga=None, restrict_targets_to=None):
+        self.save_pref = Path(out) if out else Path.cwd()
+        self.input_config = input_config
         self.ensemble_config = ensemble_config
         self.sparkles_config = sparkles_config
         self.test = test
         self.skipfit = skipfit
         self.upload_to_taiga = upload_to_taiga
-        self.restrict_targets = restrict_targets
-        self.restrict_to = restrict_to
-        self.filter_columns = filter_columns.split(",") if filter_columns else None
+        self.restrict_targets_to = restrict_targets_to.split(",") if restrict_targets_to else None
         self.save_pref.mkdir(parents=True, exist_ok=True)
         
         self.data_processor = DataProcessor(self.save_pref)
@@ -908,7 +895,7 @@ class ModelFitter:
         
     def _run_model_fitting(self, ipt_dict):
         """Execute model fitting if not skipped."""
-        print("submitting fit jobs...")
+        print("Submitting fit jobs...")
         sparkles_runner = SparklesRunner(
             self.save_pref, 
             self.ensemble_config, 
@@ -939,7 +926,7 @@ class ModelFitter:
 
     def run(self):
         # Load input configuration
-        ipt_dict = self.config_manager.load_input_config(self.input_files)
+        ipt_dict = self.config_manager.load_input_config(self.input_config)
 
         # Setup and validate ensemble configuration
         self.ensemble_config, config_dict = self.config_manager.setup_ensemble_config(
@@ -963,8 +950,7 @@ class ModelFitter:
 
         # Process dependency data
         df_dep = self.data_processor.process_dependency_data(
-            ipt_dict, self.test, self.restrict_targets, 
-            self.restrict_to, self.filter_columns
+            ipt_dict, self.test, restrict_targets_to=self.restrict_targets_to
         )
 
         # Save feature matrix file path information
@@ -985,9 +971,9 @@ class ModelFitter:
 
 @cli.command()
 @click.option(
-    "--input-files",
+    "--input-config",
     required=True,
-    help="JSON file containing the set of files for prediction",
+    help="Path to JSON config file containing the set of files for prediction",
 )
 @click.option(
     "--ensemble-config",
@@ -997,10 +983,10 @@ class ModelFitter:
 @click.option(
     "--sparkles-config", 
     required=True, 
-    help="path to the sparkles config file to use"
+    help="Path to the sparkles config file to use"
 )
 @click.option(
-    "--save-dir",
+    "--out",
     required=False,
     help="Path to where the data should be stored if not the same directory as the script",
 )
@@ -1023,58 +1009,41 @@ class ModelFitter:
     help="Upload results to Taiga",
 )
 @click.option(
-    "--restrict-targets",
-    default=False,
-    type=bool,
-    help="Restrict dependencies to a user provided subset",
-)
-@click.option(
-    "--restrict-to",
-    required=False,
-    type=str,
-    default=None,
-    help="If restrict_targets is true, provide semicolon-separated list of dependencies",
-)
-@click.option(
-    "--filter-columns",
+    "--restrict-targets-to",
     default=None,
     type=str,
     help="Comma separated list of names to filter target columns. If not provided, uses TEST_LIMIT from config.py",
 )
 def collect_and_fit(
-    input_files,
+    input_config,
     ensemble_config,
     sparkles_config,
-    save_dir=None,
+    out=None,
     test=False,
     skipfit=False,
     upload_to_taiga=None,
-    restrict_targets=False,
-    restrict_to=None,
-    filter_columns=None,
+    restrict_targets_to=None,
 ):
     """Run model fitting with either provided or auto-generated config."""
-    save_pref = Path(save_dir) if save_dir else Path.cwd()
+    save_pref = Path(out) if out else Path.cwd()
     print(f"Save directory path: {save_pref}")
     save_pref.mkdir(parents=True, exist_ok=True)
 
     # Run the model fitting
     model_fitter = ModelFitter(
-        input_files,
+        input_config,
         ensemble_config,
         sparkles_config,
-        save_dir=str(save_pref),
+        out=str(save_pref),
         test=test,
         skipfit=skipfit,
         upload_to_taiga=upload_to_taiga,
-        restrict_targets=restrict_targets,
-        restrict_to=restrict_to,
-        filter_columns=filter_columns,
+        restrict_targets_to=restrict_targets_to,
     )
     model_fitter.run()
+    print("\033[96mMy journey in Daintree has finished.\033[0m")  # Teal
 
 
 if __name__ == "__main__":
-    print("Starting Daintree CLI Instance Iteration 3")
     cli()
     
