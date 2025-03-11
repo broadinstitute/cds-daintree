@@ -34,7 +34,9 @@ docker run --pull=always --rm \
   -v "${PWD}"/output_data:/daintree/output_data \
   -v "${PWD}"/"${INPUT_CONFIG}":/daintree/model-map.json \
   -v "${PWD}"/sparkles-config:/daintree/sparkles-config \
-  us.gcr.io/broad-achilles/daintree:v5 \
+  -v "${HOME}/.taiga/token:/root/.taiga/token" \
+  -v "${HOME}/.sparkles-cache/service-keys/broad-achilles.json:/root/.sparkles-cache/service-keys/broad-achilles.json" \
+  us.gcr.io/cds-docker-containers/daintree:v1 \
   collect-and-fit \
   --input-config model-map.json \
   --sparkles-config /daintree/sparkles-config \
