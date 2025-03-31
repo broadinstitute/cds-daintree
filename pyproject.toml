@@ -4,10 +4,10 @@ version = "0.1.0"
 description = "Daintree Module"
 authors = ["Nayeem Aquib <naquib@broadinsitute.org>"]
 readme = "README.md"
-packages = [{include = "daintree"}]
+packages = [{include = "daintree_core"}, {include="daintree_scripts"}]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">3.9,<3.10"
 pandas = "1.5.3"
 click = "^8.1.7"
 numpy = "^1.25.1"
