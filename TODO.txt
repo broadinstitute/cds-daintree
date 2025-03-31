@@ -1,0 +1,9 @@
+- Add support for seeding
+   - rebuild docker image
+     - update dockerfile
+       - reorganize files into a python modules
+
+- Figure out naming/how to communcate relationship between daintree-sparkles and daintree-core 
+   It sounds like that something like: 
+     daintree-sparkles (outer command)
+       which calls daintree-core
