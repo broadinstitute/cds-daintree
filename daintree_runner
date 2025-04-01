@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+
+# this is a little unusual, but we have a challege which is going to need some engineering around:
+# different steps in the process of daintree need different execution environments. For example, 
+# the first data prep phase needs a lot of memory and needs to run inside a docker container using a 
+# specific image. Now, the actual model fitting process needs to run on multiple machines, and we'd
+# like the initial docker container to shutdown before launching the VMs. Etc.
+#
+# To cope with this, we're going to use a pattern inspired that one sees in LISPs implmented 
+# on a stack-based languages: This script is going to execute "thunks" and then "trampoline" to 
+# the next call. None of that is going to make any sense to anyone not already familar with trampolining
+# but think of it as each step writes out instructions for what to do next. This allows this runner
+# to be very tiny and very uncoupled from the code inside of the docker image that actually does the work
+
+import sys
+import subprocess
+from dataclasses import dataclass
+from typing import List, Literal, Optional
+import json
+import tempfile
+import os
+import argparse
+
+@dataclass
+class NextStep:
+    type: Literal["done", "execute"]
+    args: List[str]
+    sparkles_command: Optional[str] = None
+    sparkles_parameter_filename: Optional[str] = None
+
+@dataclass
+class DockerParams:
+    image: str
+    working_dir : str
+    extra_args: List[str]
+
+def run_step(docker_params: DockerParams, command : List[str]):
+    # each time we run a command, create a unique temp file in the working directory where
+    # the command should write a json file which describes what to do next. The command 
+    # will need to know where the file is, and we don't want to mess with the command itself,
+    # so pass via an environment variable called "DAINTREE_RUNNER_NEXT_OUTPUT"
+    pwd = os.path.abspath(".")
+    next_output_filename = tempfile.mktemp(prefix="run-step-output", suffix=".json", dir=".")
+    # new_env = os.environ.copy()
+    # new_env["DAINTREE_RUNNER_NEXT_OUTPUT"] = next_output_filename
+
+    docker_command = (["docker", "run", 
+                      "-w",
+                        docker_params.working_dir, 
+                        "-v", f"{pwd}:{docker_params.working_dir}",
+                          "-e", f'DAINTREE_RUNNER_NEXT_OUTPUT={next_output_filename}'] + docker_params.extra_args + [                      docker_params.image, 
+] + command)
+    print(f"Executing: {' '.join(docker_command)}")
+    subprocess.check_call(docker_command)
+
+    # read out from the temp file the next thing to do
+    with open(next_output_filename, "rt") as fd:
+        next_output_json = fd.read()
+    assert next_output_json != "", f"It appears that the next json file ({next_output_filename}) was empty which suggests the command {args} did not write a file and needs to be fixed"
+    os.unlink(next_output_filename) # clean up the file now that its been read
+
+    next_step = NextStep(**json.loads(next_output_json))
+
+    return next_step
+
+def run_sparkles(docker_params: DockerParams, args: List[str], parameter_file: str):
+    print(f"Executing: {' '.join(args)}")
+    subprocess.check_call(args)
+
+def run_job(docker_params : DockerParams, args : List[str]):
+    while True:
+        next_step = run_step(docker_params, args)
+        if next_step.type == "done":
+            break
+        else:
+            assert next_step.type == "execute"
+            if next_step.sparkles_command is not None:
+                # if there's a sparkles command to run, run that now
+                run_sparkles(docker_params, next_step.sparkles_command, next_step.sparkles_parameter_filename)
+
+            # update args go back to the top of the loop to execute the next command
+            args = next_step.args
+
+def main(_args: List[str]):
+    parser = argparse.ArgumentParser(description='Run a continuation style job')
+    parser.add_argument('image', type=str, help='The docker image to use')
+    parser.add_argument('--workdir', default="/work", type=str, help='Working directory path for commands run within the created containers')
+    parser.add_argument('command', nargs=argparse.REMAINDER, help='Command to execute')
+
+    args = parser.parse_args(_args)  
+    docker_params =   DockerParams(image=args.image, working_dir=args.workdir, extra_args=[])
+    run_job(docker_params, args.command)
+    
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

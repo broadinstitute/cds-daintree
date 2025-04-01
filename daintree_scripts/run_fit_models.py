@@ -904,7 +904,8 @@ class ModelFitter:
         )
         dt_hash = sparkles_runner.run()
         sparkles_runner.validate()
-        
+    
+    def _gather_and_upload(self, ipt_dict):
         model_name = ipt_dict["model_name"]
         screen_name = ipt_dict["screen_name"]
         # This could probably be hardcoded and put in a config file. However, I am 
@@ -922,7 +923,6 @@ class ModelFitter:
 
         if self.upload_to_taiga:
             self.taiga_uploader.upload_results(ipt_dict)
-
 
     def run(self):
         # Load input configuration
@@ -964,7 +964,8 @@ class ModelFitter:
         self.data_processor.partition_inputs(df_dep, config_dict)
 
         if not self.skipfit:
-            self._run_model_fitting(ipt_dict)
+            self._run_model_fitting()
+            self._gather_and_upload(ipt_dict)
         else:
             print("skipping fitting and ending run")
 

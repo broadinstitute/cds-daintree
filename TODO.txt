@@ -38,6 +38,8 @@ imagine run_daintree.sh contains:
 4. go to step 1
 
 
-execute each thunk.
+execute command with environment DAINTREE_NEXT_JSON set
 
-thunk = {type:"command", command: list[str]} | {"type": "sparkles", command: list[str], parameters: str, files_to_upload: list[str], post_command}
+thunk = {type: "done"} | 
+    {type:"command", command: list[str]} | 
+    {"type": "sparkles", command: list[str], parameters: str, files_to_upload: list[str], post_command}
