@@ -6,11 +6,19 @@
 # specific image. Now, the actual model fitting process needs to run on multiple machines, and we'd
 # like the initial docker container to shutdown before launching the VMs. Etc.
 #
-# To cope with this, we're going to use a pattern inspired that one sees in LISPs implmented 
+# To cope with this, we're going to use a pattern inspired that one sees in LISPs implemented 
 # on a stack-based languages: This script is going to execute "thunks" and then "trampoline" to 
 # the next call. None of that is going to make any sense to anyone not already familar with trampolining
-# but think of it as each step writes out instructions for what to do next. This allows this runner
-# to be very tiny and very uncoupled from the code inside of the docker image that actually does the work
+# but think of it as each step writes out instructions for what to do next. This "runner" script runs each command
+# in turn until the next step is marked as "done". 
+# 
+# This allows this runner to be very tiny and loosely from the code inside of the docker image that actually 
+# does all the work and determines what to run.
+# 
+# this script is intended to have no dependencies beyond: 
+#   python >= 3.9
+#   docker in path
+#   sparkles in path
 
 import sys
 import subprocess
@@ -20,13 +28,37 @@ import json
 import tempfile
 import os
 import argparse
+import hashlib
+import base64
+
+VERSION = "1.0"
+
+SPARKLES_JOB_NAME_PLACEHOLDER = "{sparkles_job_name}"
+SPARKLES_JOB_PATH_PLACEHOLDER = "{sparkles_job_path}"
+NEXT_OUTPUT_PLACEHOLDER = "{next_step_filename}"
 
 @dataclass
 class NextStep:
+    """
+    Each NextStep is a description of what to do next. 
+    
+    If type=="done":
+       this means there are no more steps and execution should report success and terminate.
+
+    If type=="execute":
+       if sparkles_command is populated, use sparkles to run this command 
+       
+       Afterwards, execute the command specified in "args" by running it in 
+       a new docker container via "docker run ...". 
+
+       This command must write out a new NextStep as a json file or else an exception will be thrown
+       after the command completes.
+    """
     type: Literal["done", "execute"]
     args: List[str]
-    sparkles_command: Optional[str] = None
+    sparkles_command: Optional[List[str]] = None
     sparkles_parameter_filename: Optional[str] = None
+    sparkles_uploads: Optional[List[str]] = None
 
 @dataclass
 class DockerParams:
@@ -34,22 +66,43 @@ class DockerParams:
     working_dir : str
     extra_args: List[str]
 
-def run_step(docker_params: DockerParams, command : List[str]):
+@dataclass
+class SparklesParams:
+    sparkles_path: str
+    output_path: str
+    image: str
+    workers: int
+    extra_args: List[str]
+
+@dataclass
+class SparklesResult:
+    name: str # the computed name that was used for the sparkles submission
+    path: str # the path in GCS where the results of the job are stored
+
+def run_step(docker_params: DockerParams, command : List[str], last_sparkles_result : Optional[SparklesResult]):
     # each time we run a command, create a unique temp file in the working directory where
-    # the command should write a json file which describes what to do next. The command 
-    # will need to know where the file is, and we don't want to mess with the command itself,
-    # so pass via an environment variable called "DAINTREE_RUNNER_NEXT_OUTPUT"
+    # the command should write a json file which describes what to do next. 
     pwd = os.path.abspath(".")
     next_output_filename = tempfile.mktemp(prefix="run-step-output", suffix=".json", dir=".")
-    # new_env = os.environ.copy()
-    # new_env["DAINTREE_RUNNER_NEXT_OUTPUT"] = next_output_filename
+
+    def expand_arg(arg):
+        if arg == SPARKLES_JOB_NAME_PLACEHOLDER:
+            return last_sparkles_result.name
+        elif arg == SPARKLES_JOB_PATH_PLACEHOLDER:
+            return last_sparkles_result.path
+        elif arg == NEXT_OUTPUT_PLACEHOLDER:
+            return next_output_filename
+        else:
+            return arg
+
+    expanded_command = [expand_arg(arg) for arg in command]
 
     docker_command = (["docker", "run", 
                       "-w",
                         docker_params.working_dir, 
                         "-v", f"{pwd}:{docker_params.working_dir}",
-                          "-e", f'DAINTREE_RUNNER_NEXT_OUTPUT={next_output_filename}'] + docker_params.extra_args + [                      docker_params.image, 
-] + command)
+                ] + docker_params.extra_args + [                      docker_params.image, 
+] + expanded_command)
     print(f"Executing: {' '.join(docker_command)}")
     subprocess.check_call(docker_command)
 
@@ -60,23 +113,73 @@ def run_step(docker_params: DockerParams, command : List[str]):
     os.unlink(next_output_filename) # clean up the file now that its been read
 
     next_step = NextStep(**json.loads(next_output_json))
+    print(f"next step: {next_step}")
 
     return next_step
 
-def run_sparkles(docker_params: DockerParams, args: List[str], parameter_file: str):
-    print(f"Executing: {' '.join(args)}")
-    subprocess.check_call(args)
+def _calculate_file_hash(filename):
+    hash = hashlib.sha256()
+    with open(filename, "rb") as fd:
+        while True:
+            data = fd.read(1000000)
+            if not data:
+                break
+            hash.update(data)
+    return hash.digest()
 
-def run_job(docker_params : DockerParams, args : List[str]):
+def _calculate_job_hash(param_str : str, filenames: List[str]):
+    hash = hashlib.sha256(param_str.encode("utf8"))
+    for filename in filenames:
+        hash.update(filename.encode("utf8"))
+
+        # if this is a sparkles upload of the format "src:dst" then "src" is the path of the file we want to hash
+        if ":" in filename:
+            filename = filename.split(":")[0]
+
+        file_hash = _calculate_file_hash(filename)
+        # compute the hashes of the files individually so we can print out the hash of each (useful for debugging and telling which file is different from past run)
+        print(f"Computed hash of {filename}: {file_hash.hex()}")
+    return base64.b64encode(hash.digest(), b"az").decode('utf8')[:10]
+
+def run_sparkles(sparkles_params: SparklesParams, args: List[str], parameter_file: str, uploads : List[str]):
+    hash = _calculate_job_hash(f"daintree v{VERSION} {sparkles_params.image}", ([parameter_file] if parameter_file else [])+uploads)
+    job_name = f"daintree_{hash}"
+    job_path = f"{sparkles_params.output_path}/{job_name}"
+
+    # construct a "sparkles sub ..." command
+    command = [ sparkles_params.sparkles_path ] + sparkles_params.extra_args + ["sub"]
+
+    # specify the path to CSV of parameters to vary
+    if(parameter_file):
+        command.extend(["--params", parameter_file])
+
+    # specify the various other hardcoded parameters
+    command.extend(["-i", sparkles_params.image, "--nodes", f"{sparkles_params.workers}", "--skipifexists", "-n", job_name ])
+
+    # add all the files which should be localized to each worker
+    for upload in uploads:
+         command.extend(["-u", upload])
+
+    # add the command that we want sparkles to run on the spawned VMs    
+    command.extend(args)
+
+    # now run the resulting command
+    print(f"Executing: {' '.join(command)}")
+    subprocess.check_call(command)
+
+    return SparklesResult(job_name, job_path)
+
+def run_job(docker_params : DockerParams, sparkles_params: SparklesParams, args : List[str]):
+    last_sparkles_result = None
     while True:
-        next_step = run_step(docker_params, args)
+        next_step = run_step(docker_params, args, last_sparkles_result)
         if next_step.type == "done":
             break
         else:
             assert next_step.type == "execute"
             if next_step.sparkles_command is not None:
                 # if there's a sparkles command to run, run that now
-                run_sparkles(docker_params, next_step.sparkles_command, next_step.sparkles_parameter_filename)
+                last_sparkles_result = run_sparkles(sparkles_params, next_step.sparkles_command, next_step.sparkles_parameter_filename, next_step.sparkles_uploads)
 
             # update args go back to the top of the loop to execute the next command
             args = next_step.args
@@ -85,11 +188,21 @@ def main(_args: List[str]):
     parser = argparse.ArgumentParser(description='Run a continuation style job')
     parser.add_argument('image', type=str, help='The docker image to use')
     parser.add_argument('--workdir', default="/work", type=str, help='Working directory path for commands run within the created containers')
+    parser.add_argument('--sparkles-workers', default=100, type=int, help='Number of workers to request when running sparkles jobs')
+    parser.add_argument('--sparkles-args', default=None, help='List of options to pass to sparkles (useful for setting --config parameter)')
     parser.add_argument('command', nargs=argparse.REMAINDER, help='Command to execute')
 
     args = parser.parse_args(_args)  
     docker_params =   DockerParams(image=args.image, working_dir=args.workdir, extra_args=[])
-    run_job(docker_params, args.command)
+
+    if args.sparkles_args:
+        sparkles_args = args.sparkles_args.split(" ")
+    else:
+        sparkles_args = []
+
+    sparkles_params = SparklesParams(image=args.image, workers=args.sparkles_workers, extra_args=sparkles_args, sparkles_path="sparkles", output_path="gs://invalid-bucket/foo")
+                                     
+    run_job(docker_params, sparkles_params, args.command)
     
 
 if __name__ == "__main__":

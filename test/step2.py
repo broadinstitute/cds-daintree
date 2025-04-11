@@ -3,9 +3,8 @@ import os
 import json
 import sys
 
-next_output_path = os.environ["DAINTREE_RUNNER_NEXT_OUTPUT"]
-
-rand_value = sys.argv[1]
+next_output_path = sys.argv[1]
+rand_value = sys.argv[2]
 
 with open(f"test_output/step2-completed-{rand_value}", "wt") as fd:
     fd.write("done")
