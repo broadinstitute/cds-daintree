@@ -924,7 +924,7 @@ class ModelFitter:
         if self.upload_to_taiga:
             self.taiga_uploader.upload_results(ipt_dict)
 
-    def run(self):
+    def prepare(self):
         # Load input configuration
         ipt_dict = self.config_manager.load_input_config(self.input_config)
 
@@ -963,12 +963,11 @@ class ModelFitter:
         print("Partitioning inputs...")
         self.data_processor.partition_inputs(df_dep, config_dict)
 
-        if not self.skipfit:
-            self._run_model_fitting()
-            self._gather_and_upload(ipt_dict)
-        else:
-            print("skipping fitting and ending run")
+    def scatter(self):
+        self._run_model_fitting()
 
+    def gather(self):
+            self._gather_and_upload(ipt_dict)
 
 @cli.command()
 @click.option(
@@ -1041,7 +1040,7 @@ def collect_and_fit(
         upload_to_taiga=upload_to_taiga,
         restrict_targets_to=restrict_targets_to,
     )
-    model_fitter.run()
+    model_fitter.prepare()
     print("\033[96mMy journey in Daintree has finished.\033[0m")  # Teal
 
 
