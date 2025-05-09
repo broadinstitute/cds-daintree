@@ -4,6 +4,7 @@ from pathlib import Path
 
 from taigapy.client_v3 import UploadedFile, LocalFormat
 from taigapy import create_taiga_client_v3
+from typing import Union
 
 
 def calculate_feature_correlations(x, y):
@@ -26,8 +27,8 @@ def update_taiga(
     description_of_changes: str,
     matrix_name_in_taiga: str,
     file_local_path: Path,
-    file_format: str,
-) -> None:
+    file_format: Union[str, LocalFormat],
+) -> str:
     """Update a dataset in Taiga with transformed data."""
     assert dataset_id, "Dataset ID cannot be empty"
     assert description_of_changes, "Description of changes cannot be empty"
@@ -39,6 +40,9 @@ def update_taiga(
         file_format = LocalFormat.CSV_TABLE
     elif file_format == "csv_matrix":
         file_format = LocalFormat.CSV_MATRIX
+    else:
+        assert isinstance(file_format, LocalFormat)
+        
     try:
         tc = create_taiga_client_v3()
         # Update the dataset with the transformed data
@@ -48,7 +52,7 @@ def update_taiga(
             additions=[
                 UploadedFile(
                     matrix_name_in_taiga,
-                    local_path=file_local_path,
+                    local_path=str(file_local_path),
                     format=file_format,
                 )
             ],

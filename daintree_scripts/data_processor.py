@@ -1,0 +1,338 @@
+import pandas as pd
+from .config import TEST_LIMIT, FILES, PATHS
+import re
+from pathlib import Path
+import os
+import subprocess
+import numpy as np
+from utils import calculate_feature_correlations, update_taiga
+
+def _clean_dataframe(df : pd.DataFrame,index_col):
+    """Clean and sort the dataframe.
+    Args:
+        df: DataFrame to clean and sort
+        index_col: Index column number
+    Returns:
+        pd.DataFrame: Cleaned and sorted dataframe
+    """
+    df.sort_index(inplace=True, axis=1)
+
+    if index_col is None:
+        df.sort_values(df.columns.tolist(), inplace=True)
+    else:
+        df.sort_index(inplace=True)
+
+    return df
+
+
+def _process_model_correlations(model, partitions_df, targets_df):
+    """Calculate correlation between model predictions and actual target values.
+    Args:
+        model: Name of the model whose predictions to process
+        partitions_df: DataFrame containing paths to prediction files for each partition
+        targets_df: DataFrame containing actual target values
+    Returns:
+        pd.DataFrame: DataFrame containing Pearson correlations for each target variable
+                        with columns: [target_variable, pearson, model]
+    """
+    # Get paths to prediction files for this specific model
+    predictions_filenames = partitions_df[partitions_df["model"] == model]["predictions_path"]
+    
+    # Combine predictions from all partitions into a single DataFrame
+    # Each file contains predictions for a subset of targets
+    predictions = pd.DataFrame().join(
+        [pd.read_csv(f, index_col=0) for f in predictions_filenames], 
+        how="outer"
+    )
+    
+    # Calculate Pearson correlation between predictions and actual values
+    cors = predictions.corrwith(targets_df)
+    
+    cors = (
+        pd.DataFrame(cors)
+        .reset_index()
+        .rename(columns={
+            "index": "target_variable",  # Name of the target variable
+            0: "pearson"                 # Correlation coefficient
+        })
+    )
+    
+    cors["model"] = model
+    
+    return cors
+
+
+def process_biomarker_matrix(df : pd.DataFrame, index_col : int =0, test : bool =False):
+    """Process biomarker matrix data.
+    Args:
+        df: Biomarker matrix dataframe
+        index_col: Index column number
+        test: Test flag
+    Returns:
+        pd.DataFrame: Processed biomarker matrix
+    """
+    print("Start Processing Biomarker Matrix")
+    df = _clean_dataframe(df,index_col)
+    # if test:
+    #     df = df.iloc[:, :TEST_LIMIT]
+    print("End Processing Biomarker Matrix")
+
+    return df
+
+
+def _process_dep_matrix(df : pd.DataFrame,test=False, restrict_targets_to=None):
+    """Process dependency matrix data.
+    Args:
+        df: Dependency matrix dataframe
+        test: Test flag
+        restrict_targets_to: Comma Separated list of targets to restrict the matrix to
+    Returns:
+        pd.DataFrame: Processed dependency matrix
+    """
+    print("Start Processing Dependency Matrix")
+    df = df.dropna(how="all", axis=0)
+    df = df.dropna(how="all", axis=1)
+    df.index.name = "Row.name"
+    df = df.reset_index()
+
+    if test:
+        print("\033[93mWarning: Truncating datasets for testing...\033[0m") # Yellow
+        # If no specific targets, apply column filtering
+        if restrict_targets_to:
+            restrict_targets_to.insert(0, "Row.name")
+            pattern = r'\b(' + '|'.join(re.escape(col) for col in restrict_targets_to) + r')\b'
+            mask = df.columns.str.contains(pattern, regex=True)
+            df = df.loc[:, mask]
+        else:
+            # If no filter columns provided, take first TEST_LIMIT+1 columns
+            # (+1 because first column is Row.name)
+            df = df.iloc[:, :TEST_LIMIT+1]
+    else:
+        print("\033[93mWarning: Not truncating datasets. This may take a while...\033[0m") # Yellow
+        
+    print("End Processing Dependency Matrix")
+
+    return df
+
+
+
+
+def _prepare_partition_paths(save_pref: Path, partitions_df, data_dir, features_suffix, predictions_suffix):
+    partitions_df["path_prefix"] = (
+        data_dir + "/" + partitions_df["model"] + "_" + 
+        partitions_df["start"].map(str) + "_" + 
+        partitions_df["end"].map(str) + "_"
+    )
+    partitions_df["feature_path"] = save_pref / (
+        partitions_df["path_prefix"] + features_suffix
+    )
+    partitions_df["predictions_path"] = save_pref / (
+        partitions_df["path_prefix"] + predictions_suffix
+    )
+    
+    assert all(os.path.exists(f) for f in partitions_df["feature_path"])
+    assert all(os.path.exists(f) for f in partitions_df["predictions_path"])
+    
+    return partitions_df
+
+def process_dependency_data(tc, save_pref, ipt_dict, *, test=False, restrict_targets_to=None):
+    """Process dependency matrix data from Taiga and prepare it for model training.
+    
+    Args:
+        ipt_dict: Dictionary containing input configuration with dataset metadata
+        test: If True, limits data size for testing purposes
+        restrict_targets_to: List of column names to filter the target matrix by
+    
+    Returns:
+        pd.DataFrame: Processed dependency matrix ready for model training
+    """
+    print("Processing dependency data...")
+    
+    # Find the Taiga ID for the target matrix by looking through input dictionary
+    # for the first entry with table_type="target_matrix"
+    dep_matrix_taiga_id = next(
+        (v.get("taiga_id") for v in ipt_dict["data"].values() 
+            if v.get("table_type") == "target_matrix"), 
+        None
+    )
+    
+    df_dep = tc.get(dep_matrix_taiga_id)
+    
+    df_dep = _process_dep_matrix(
+        df_dep, test, restrict_targets_to=restrict_targets_to
+    )
+    
+    print("\033[92m================================================") # Green
+    print(f"Processed Target Matrix")
+    print("================================================\033[0m")
+    print(df_dep.head())
+
+    # Save the processed matrix
+    df_dep.to_csv(save_pref / FILES['target_matrix'])
+    df_dep.to_feather(save_pref / FILES['target_matrix'])
+    
+    return df_dep
+
+
+def prepare_data(save_pref: Path, out_rel, ensemble_config):
+    """Prepare data for model fitting."""
+    daintree_bin = Path(PATHS['daintree_bin'])
+    target_matrix = save_pref / FILES['target_matrix']
+    target_matrix_filtered = save_pref / FILES['target_matrix_filtered']
+    
+    # Note that these parameters are from daintree_package or cds-ensemble
+    print('Running "prepare-y"...')
+    try:
+        subprocess.check_call([
+            str(daintree_bin),
+            "prepare-y",
+            "--input", str(target_matrix),
+            "--output", str(target_matrix_filtered),
+        ])
+    except subprocess.CalledProcessError as e:
+        print(f"Error preparing target data: {e}")
+        raise
+
+    # Note that these parameters are from daintree_package or cds-ensemble
+    print('Running "prepare-x"...')
+    prep_x_cmd = [
+        str(daintree_bin),
+        "prepare-x",
+        "--model-config", str(ensemble_config),
+        "--targets", str(target_matrix_filtered),
+        "--feature-info", str(save_pref / FILES['feature_path_info']),
+        "--output", str(save_pref / FILES['feature_matrix']),
+    ]
+    
+    if out_rel:
+        prep_x_cmd.extend(["--output-related", "related"])
+    
+    try:
+        subprocess.check_call(prep_x_cmd)
+    except subprocess.CalledProcessError as e:
+        print(f"Error preparing feature data: {e}")
+        raise
+
+# TODO: Would like to add seeding in future
+def partition_inputs(save_pref : Path, dep_matrix, ensemble_config):
+    """
+    Divides the dependency matrix columns (genes) into chunks for parallel processing.
+    For each model in the ensemble, it creates partitions based on the number of jobs specified
+    in the model config.
+    Args:
+        dep_matrix: DataFrame containing the dependency matrix
+        ensemble_config: Dictionary containing configuration for each model in the ensemble
+                        Each model config must have a "Jobs" key specifying number of partitions
+                        So if a model specifies 10 jobs and there are 100 genes:
+                            - Creates 10 partitions of ~10 genes each
+                            - First 9 partitions will have exactly 10 genes
+                            - Last partition will have remaining genes (also 10 in this case)
+    """
+    # Get total number of genes (columns) to partition
+    num_genes = dep_matrix.shape[1]
+    start_indices = []
+    end_indices = []
+    models = []
+
+    for model_name, model_config in ensemble_config.items():
+        num_jobs = int(model_config["Jobs"])
+        start_index = np.array(range(0, num_genes, num_jobs))
+        end_index = start_index + num_jobs
+        
+        # Ensure the last partition includes any remaining genes
+        end_index[-1] = num_genes
+        
+        # Store partition boundaries and model names
+        start_indices.append(start_index)
+        end_indices.append(end_index)
+        models.append([model_name] * len(start_index))
+
+    param_df = pd.DataFrame(
+        {
+            "start": np.concatenate(start_indices),  # Start index of each partition
+            "end": np.concatenate(end_indices),      # End index of each partition
+            "model": np.concatenate(models),         # Model name for each partition
+        }
+    )
+    
+    # Save partition information to CSV file
+    param_df.to_csv(save_pref / FILES['partitions'], index=False)
+
+
+def gather_ensemble_tasks(save_pref : Path, features="X.ftr", targets="target_matrix.ftr", top_n=50):
+    """Gather and process ensemble model results, combining predictions and feature importances.
+    Args:
+        features: Path to feature matrix file (default: "X.ftr")
+        targets: Path to target matrix file (default: "target_matrix.ftr")
+        top_n: Number of top features to analyze for correlations (default: 50)
+    Returns:
+        tuple: (ensemble_df, predictions_df)
+            - ensemble_df: DataFrame with model performance and feature importance details
+            - predictions_df: DataFrame containing all model predictions
+    """
+    features_df = pd.read_feather(save_pref / features)
+    targets_df = pd.read_feather(save_pref / targets)
+    targets_df = targets_df.set_index("Row.name")
+    partitions_df = pd.read_csv(save_pref / FILES['partitions'])
+    partitions_df = _prepare_partition_paths(save_pref, 
+        partitions_df, "data", "features.csv", "predictions.csv"
+    )
+    
+    # Combine feature importance information from all partitions
+    all_features = pd.concat(
+        [pd.read_csv(f) for f in partitions_df["feature_path"]], 
+        ignore_index=True
+    )
+    all_features.drop(["score0", "score1", "best"], axis=1, inplace=True)
+    
+    # Combine predictions from all partitions
+    predictions = pd.DataFrame().join(
+        [pd.read_csv(f, index_col=0) for f in partitions_df["predictions_path"]], 
+        how="outer"
+    )
+    
+    # Calculate correlations between predictions and actual values for each model
+    all_cors = []
+    for model in all_features["model"].unique():
+        cors = _process_model_correlations(model, partitions_df, targets_df)
+        all_cors.append(cors)
+    
+    # Combine correlation results and merge with feature importance data
+    all_cors = pd.concat(all_cors, ignore_index=True)
+    ensemble = all_features.merge(all_cors, on=["target_variable", "model"])
+    
+    # Identify best performing model for each target variable
+    ensemble = ensemble.copy()
+    ranked_pearson = ensemble.groupby("target_variable")["pearson"].rank(ascending=False)
+    ensemble["best"] = (ranked_pearson == 1)
+    
+    ensb_cols = ["target_variable", "model", "pearson", "best"]
+    
+    for index, row in ensemble.iterrows():
+        target_variable = row['target_variable']
+        y = targets_df[target_variable]  # Actual values for this target
+        
+        # Process top N(50 at this moment) features
+        for i in range(top_n):
+            feature_col = f'feature{i}'
+            feature_name = row[feature_col]
+            
+            # Calculate correlation if feature exists in feature matrix
+            if feature_name in features_df.columns:
+                corr = calculate_feature_correlations(features_df[feature_name], y)
+                ensemble.loc[index, f'{feature_col}_correlation'] = corr
+    
+    # Build final column list including feature information
+    for i in range(top_n):
+        feature_cols = [
+            f"feature{i}",                # Feature name
+            f"feature{i}_importance",     # Feature importance score
+            f"feature{i}_correlation"     # Feature correlation with target
+        ]
+        ensb_cols.extend(feature_cols)
+    
+    # Sort and select final columns
+    ensemble = ensemble.sort_values(["target_variable", "model"])[ensb_cols]
+    
+    return ensemble, predictions
+

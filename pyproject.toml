@@ -22,6 +22,7 @@ priority = "explicit"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
+pyright = "^1.1.400"
 
 [build-system]
 requires = ["poetry-core"]
