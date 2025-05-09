@@ -12,10 +12,10 @@ def calculate_feature_correlations(x, y):
     x = x.reset_index(drop=True)
     y = y.reset_index(drop=True)
     mask = ~pd.isna(x) & ~pd.isna(y)
-    
+
     x_filtered = x[mask]
     y_filtered = y[mask]
-    
+
     if len(x_filtered) > 1 and len(y_filtered) > 1:
         corr, _ = pearsonr(x_filtered, y_filtered)
         return corr
@@ -42,7 +42,7 @@ def update_taiga(
         file_format = LocalFormat.CSV_MATRIX
     else:
         assert isinstance(file_format, LocalFormat)
-        
+
     try:
         tc = create_taiga_client_v3()
         # Update the dataset with the transformed data
@@ -64,4 +64,3 @@ def update_taiga(
     except Exception as e:
         print(f"Error updating Taiga: {e}")
         raise
-    

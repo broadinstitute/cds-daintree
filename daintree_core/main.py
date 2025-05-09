@@ -16,6 +16,7 @@ from .parsing_utilities import (
     read_feature_info,
 )
 
+
 @click.group()
 def main():
     pass

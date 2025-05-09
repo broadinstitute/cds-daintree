@@ -9,6 +9,7 @@ from typing import Optional, List
 from . import config_manager
 from . import data_processor
 
+
 def _process_column_name(col, feature_dataset_name):
     """Process column name to generate feature name, label, and given id for breadbox.
     Args:
@@ -23,14 +24,24 @@ def _process_column_name(col, feature_dataset_name):
     match = re.match(r"(.+?) \((\d+)\)", col)
     if match:
         feature_label, given_id = match.groups()
-        feature_name = f"{feature_label.replace('-', '_')}_({given_id})_{feature_dataset_name}"
+        feature_name = (
+            f"{feature_label.replace('-', '_')}_({given_id})_{feature_dataset_name}"
+        )
     else:
         feature_label = col
         given_id = col
-        feature_name = re.sub(r'[\s-]+', '_', col) + f"_{feature_dataset_name}"
+        feature_name = re.sub(r"[\s-]+", "_", col) + f"_{feature_dataset_name}"
     return feature_name, feature_label, given_id
 
-def process_dataset_for_feature_metadata(dataset_metadata_df, dataset_name, dataset_metadata, model_name, related_dset, test=False):
+
+def process_dataset_for_feature_metadata(
+    dataset_metadata_df,
+    dataset_name,
+    dataset_metadata,
+    model_name,
+    related_dset,
+    test=False,
+):
     """Process a single dataset and generate feature metadata.
     Args:
         dataset_name: Name of the dataset
@@ -43,31 +54,36 @@ def process_dataset_for_feature_metadata(dataset_metadata_df, dataset_name, data
         pd.DataFrame: Single Dataset Feature metadata
     """
     feature_metadata_rows = []
-    _df = dataset_metadata_df # self.tc.get(dataset_metadata["taiga_id"])
+    _df = dataset_metadata_df  # self.tc.get(dataset_metadata["taiga_id"])
 
     if (related_dset is None) or (
         (related_dset is not None) and dataset_name != related_dset
     ):
         _df = data_processor.process_biomarker_matrix(_df, 0, test)
-    print("\033[92m================================================") # Green
+    print("\033[92m================================================")  # Green
     print(f"Processed Feature Dataset: {dataset_name}")
-    print("================================================\033[0m")  
+    print("================================================\033[0m")
     print(_df.head())
 
     for col in _df.columns:
         feature_name, feature_label, given_id = _process_column_name(col, dataset_name)
-        feature_metadata_rows.append({
-            "model": model_name,
-            "feature_name": feature_name,
-            "feature_label": feature_label,
-            "given_id": given_id,
-            "taiga_id": dataset_metadata["taiga_id"],
-            "dim_type": dataset_metadata["dim_type"]
-        })
+        feature_metadata_rows.append(
+            {
+                "model": model_name,
+                "feature_name": feature_name,
+                "feature_label": feature_label,
+                "given_id": given_id,
+                "taiga_id": dataset_metadata["taiga_id"],
+                "dim_type": dataset_metadata["dim_type"],
+            }
+        )
 
     return _df, pd.DataFrame(feature_metadata_rows)
 
-def generate_feature_metadata(tc, ipt_dict, feature_path_info, related_dset, test=False):
+
+def generate_feature_metadata(
+    tc, ipt_dict, feature_path_info, related_dset, test=False
+):
     """Process feature information for all datasets and generate feature metadata.
     Args:
         ipt_dict: Input dictionary
@@ -78,24 +94,42 @@ def generate_feature_metadata(tc, ipt_dict, feature_path_info, related_dset, tes
         pd.DataFrame: Concatenated feature metadata for all datasets
     """
     print("Generating feature metadata...")
-    feature_metadata_df = pd.DataFrame(columns=["model", "feature_name", "feature_label", "given_id", "taiga_id", "dim_type"])
+    feature_metadata_df = pd.DataFrame(
+        columns=[
+            "model",
+            "feature_name",
+            "feature_label",
+            "given_id",
+            "taiga_id",
+            "dim_type",
+        ]
+    )
 
     model_name = ipt_dict["model_name"]
     for dataset_name, dataset_metadata in ipt_dict["data"].items():
         if dataset_metadata["table_type"] not in ["feature", "relation"]:
             continue
-            
+
         dataset_metadata_df = tc.get(dataset_metadata["taiga_id"])
-        _df, dataset_info = process_dataset_for_feature_metadata(dataset_metadata_df, dataset_name, dataset_metadata, model_name, related_dset, test)
+        _df, dataset_info = process_dataset_for_feature_metadata(
+            dataset_metadata_df,
+            dataset_name,
+            dataset_metadata,
+            model_name,
+            related_dset,
+            test,
+        )
         # Concatenate the feature metadata for all datasets
-        feature_metadata_df = pd.concat([feature_metadata_df, dataset_info], ignore_index=True)
+        feature_metadata_df = pd.concat(
+            [feature_metadata_df, dataset_info], ignore_index=True
+        )
         # Saving the downloaded feature matrix to a csv file
         _df.to_csv(feature_path_info.set_index("dataset").loc[dataset_name].filename)
-    
+
     return feature_metadata_df
 
 
-def generate_feature_path_info(save_pref, data :dict[str, dict]):
+def generate_feature_path_info(save_pref, data: dict[str, dict]):
     """Generate feature path information.
     Args:
         ipt_dicts: Input dictionaries
@@ -108,17 +142,29 @@ def generate_feature_path_info(save_pref, data :dict[str, dict]):
             dsets.append(dset_name)
     fnames = [str(save_pref / (dset + ".csv")) for dset in dsets]
 
-    df = pd.DataFrame({"dataset": dsets, "filename": fnames,})
+    df = pd.DataFrame(
+        {
+            "dataset": dsets,
+            "filename": fnames,
+        }
+    )
 
     return df
 
 
-def prepare(tc, ensemble_config, test : bool, restrict_targets_to: Optional[List[str]], input_config, save_pref: Path):
+def prepare(
+    tc,
+    ensemble_config,
+    test: bool,
+    restrict_targets_to: Optional[List[str]],
+    input_config,
+    save_pref: Path,
+):
     ipt_dict = config_manager.load_input_config(input_config)
 
     # Setup and validate ensemble configuration
-    config_path, config_dict = config_manager.setup_ensemble_config(save_pref, 
-        ensemble_config, ipt_dict
+    config_path, config_dict = config_manager.setup_ensemble_config(
+        save_pref, ensemble_config, ipt_dict
     )
 
     print("Generating feature index and files...")
@@ -137,8 +183,8 @@ def prepare(tc, ensemble_config, test : bool, restrict_targets_to: Optional[List
     )
 
     # Process dependency data
-    df_dep = data_processor.process_dependency_data(tc, 
-        ipt_dict, test, restrict_targets_to=restrict_targets_to
+    df_dep = data_processor.process_dependency_data(
+        tc, ipt_dict, test, restrict_targets_to=restrict_targets_to
     )
 
     # Save feature matrix file path information
@@ -153,14 +199,20 @@ def prepare(tc, ensemble_config, test : bool, restrict_targets_to: Optional[List
 
     _write_parameter_csv(output_file, ranges)
 
+
 @dataclass
 class Range:
     start: int
     stop: int
 
-def _write_parameter_csv(output_file : str, ranges: List[Range]):
+
+def _write_parameter_csv(output_file: str, ranges: List[Range]):
     with open(output_file, "wt") as fd:
         w = csv.writer(fd)
         w.writerow(["command"])
         for start, end, model in ranges:
-            w.writerow([f"{PATHS['daintree_bin']} fit-model --x X.ftr --y target.ftr --model-config model-config.yaml --n-folds {MODEL['n_folds']} --target-range {start} {end} --model {model}"])
+            w.writerow(
+                [
+                    f"{PATHS['daintree_bin']} fit-model --x X.ftr --y target.ftr --model-config model-config.yaml --n-folds {MODEL['n_folds']} --target-range {start} {end} --model {model}"
+                ]
+            )

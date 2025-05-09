@@ -231,7 +231,6 @@ class EnsembleRegressor:
         Splitter=StratifiedKFold,
         rounding=False,
     ):
-
         """
         model_types: [{'Name': str, 'ModelClass': class,  'kwargs': dict}] Model classes will be initiated with the
             dict of keyword arguments
@@ -354,10 +353,12 @@ class EnsembleRegressor:
                     row["score%i" % j] = self.scores[target_variable][i][j]
                 for j in range(50):
                     try:
-                        row["feature%i" % j] = self.important_features[target_variable][i].index[j]
-                        row["feature%i_importance" % j] = self.important_features[target_variable][
+                        row["feature%i" % j] = self.important_features[target_variable][
                             i
-                        ].iloc[j]
+                        ].index[j]
+                        row["feature%i_importance" % j] = self.important_features[
+                            target_variable
+                        ][i].iloc[j]
                     except IndexError:
                         row["feature%i" % j] = np.nan
                         row["feature%i_importance" % j] = np.nan
@@ -625,9 +626,11 @@ def run_model(
             "length of X and Y do not match (shapes %r and %r)" % (X.shape, Y.shape)
         )
     Xtrain = [X]
-    assert len(Xtrain) == len(models), (
-        "number of models %i does not match number of feature sets %i"
-        % (len(models), len(Xtrain))
+    assert len(Xtrain) == len(
+        models
+    ), "number of models %i does not match number of feature sets %i" % (
+        len(models),
+        len(Xtrain),
     )
     for i, x in enumerate(Xtrain):
         assert x.shape[1] > 0, "feature set %i does not have any columns" % i

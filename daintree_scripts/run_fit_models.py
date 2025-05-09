@@ -15,15 +15,23 @@ from . import config_manager
 
 from taigapy import create_taiga_client_v3
 
-from config import PATHS, CONTAINER, FILES, MODEL, TEST_LIMIT, filter_columns_gene, filter_columns_oncref
+from config import (
+    PATHS,
+    CONTAINER,
+    FILES,
+    MODEL,
+    TEST_LIMIT,
+    filter_columns_gene,
+    filter_columns_oncref,
+)
 from utils import calculate_feature_correlations, update_taiga
+
 
 # CLI Setup
 @click.group()
 def cli():
     print("\033[96mHello, World! Here I start my journey in Daintree.\033[0m")  # Teal
     pass
-
 
 
 # class SparklesRunner:
@@ -60,7 +68,7 @@ def cli():
 #             "--target-range", "{start}", "{end}",
 #             "--model", "{model}"
 #         ]
-        
+
 #         if self.related:
 #             base_cmd.extend([
 #                 "-u", f"{self.save_pref}/related.ftr:related.ftr",
@@ -68,100 +76,99 @@ def cli():
 #             ])
 #         return base_cmd
 
-    # def _watch_jobs(self):
-    #     subprocess.check_call([self.sparkles_path, "--config", self.sparkles_config, 
-    #                          "watch", f"ensemble_{self.dt_hash}", "--loglive"])
+# def _watch_jobs(self):
+#     subprocess.check_call([self.sparkles_path, "--config", self.sparkles_config,
+#                          "watch", f"ensemble_{self.dt_hash}", "--loglive"])
 
-    # def _reset_jobs(self):
-    #     subprocess.check_call([self.sparkles_path, "--config", self.sparkles_config, 
-    #                          "reset", f"ensemble_{self.dt_hash}"])
+# def _reset_jobs(self):
+#     subprocess.check_call([self.sparkles_path, "--config", self.sparkles_config,
+#                          "reset", f"ensemble_{self.dt_hash}"])
 
-    # def _validate_jobs_complete(self):
-    #     """Validate that all expected job outputs exist"""
-    #     with open(f"{self.save_pref}/completed_jobs.txt") as f:
-    #         completed_jobs = {l.split("/")[-1].strip() for l in f.readlines()}
+# def _validate_jobs_complete(self):
+#     """Validate that all expected job outputs exist"""
+#     with open(f"{self.save_pref}/completed_jobs.txt") as f:
+#         completed_jobs = {l.split("/")[-1].strip() for l in f.readlines()}
 
-    #     partitions = pd.read_csv(f"{self.save_pref}/partitions.csv")
-    #     partitions["path_prefix"] = (
-    #         partitions["model"]
-    #         + "_"
-    #         + partitions["start"].map(str)
-    #         + "_"
-    #         + partitions["end"].map(str)
-    #         + "_"
-    #     )
-    #     partitions["feature_path"] = partitions["path_prefix"] + "features.csv"
-    #     partitions["predictions_path"] = partitions["path_prefix"] + "predictions.csv"
+#     partitions = pd.read_csv(f"{self.save_pref}/partitions.csv")
+#     partitions["path_prefix"] = (
+#         partitions["model"]
+#         + "_"
+#         + partitions["start"].map(str)
+#         + "_"
+#         + partitions["end"].map(str)
+#         + "_"
+#     )
+#     partitions["feature_path"] = partitions["path_prefix"] + "features.csv"
+#     partitions["predictions_path"] = partitions["path_prefix"] + "predictions.csv"
 
-    #     assert len(set(partitions["feature_path"]) - completed_jobs) == 0, "Missing feature files"
-    #     assert len(set(partitions["predictions_path"]) - completed_jobs) == 0, "Missing prediction files"
+#     assert len(set(partitions["feature_path"]) - completed_jobs) == 0, "Missing feature files"
+#     assert len(set(partitions["predictions_path"]) - completed_jobs) == 0, "Missing prediction files"
 
-    # def _process_completed_jobs(self):
-    #     """Process completed jobs and copy results to local directory.
-    #     """
-    #     os.makedirs(f"{self.save_pref}/data", exist_ok=True)
-    #     default_url_prefix = self._get_default_url_prefix()
-        
-    #     self._authenticate_gcloud()
-        
-    #     completed_jobs = subprocess.check_output([
-    #         "/google-cloud-sdk/bin/gcloud", 
-    #         "storage", 
-    #         "ls", 
-    #         f"{default_url_prefix}/ensemble_{self.dt_hash}/*/*.csv"
-    #     ]).decode()
-        
-    #     self._save_completed_jobs(completed_jobs)
-    #     self._validate_jobs_complete()
-    #     self._copy_results_to_local()
+# def _process_completed_jobs(self):
+#     """Process completed jobs and copy results to local directory.
+#     """
+#     os.makedirs(f"{self.save_pref}/data", exist_ok=True)
+#     default_url_prefix = self._get_default_url_prefix()
 
-    # def _get_default_url_prefix(self):
-    #     """Get the default URL prefix from the sparkles config file.
-    #     """
-    #     with open(self.sparkles_config, 'r') as f:
-    #         for line in f:
-    #             if 'default_url_prefix' in line:
-    #                 return line.split('=')[1].strip()
+#     self._authenticate_gcloud()
 
-    # def _authenticate_gcloud(self):
-    #     subprocess.check_call([
-    #         "/google-cloud-sdk/bin/gcloud", 
-    #         "auth", 
-    #         "activate-service-account", 
-    #         "--key-file", 
-    #         PATHS['service_account']
-    #     ])
+#     completed_jobs = subprocess.check_output([
+#         "/google-cloud-sdk/bin/gcloud",
+#         "storage",
+#         "ls",
+#         f"{default_url_prefix}/ensemble_{self.dt_hash}/*/*.csv"
+#     ]).decode()
 
-    # def _save_completed_jobs(self, completed_jobs):
-    #     with open(f"{self.save_pref}/completed_jobs.txt", 'w') as f:
-    #         f.write(completed_jobs)
+#     self._save_completed_jobs(completed_jobs)
+#     self._validate_jobs_complete()
+#     self._copy_results_to_local()
 
-    # def _copy_results_to_local(self):
-    #     """Copy results from Google Cloud Storage to local directory.
-    #     """
-    #     default_url_prefix = self._get_default_url_prefix()
-    #     subprocess.check_call([
-    #         "/google-cloud-sdk/bin/gcloud",
-    #         "storage",
-    #         "cp",
-    #         f"{default_url_prefix}/ensemble_{self.dt_hash}/*/*.csv",
-    #         f"{self.save_pref}/data"
-    #     ])
-    
-    # def run(self):
-    #     cmd = self._build_sparkles_command()
-    #     print(f"Running sparkles with command: {cmd}")
-    #     subprocess.check_call(cmd)
-    #     print("Sparkles run complete")
-    #     return self.dt_hash
+# def _get_default_url_prefix(self):
+#     """Get the default URL prefix from the sparkles config file.
+#     """
+#     with open(self.sparkles_config, 'r') as f:
+#         for line in f:
+#             if 'default_url_prefix' in line:
+#                 return line.split('=')[1].strip()
 
-    # def validate(self):
-    #     print("Validating sparkles run...")
-    #     self._watch_jobs()
-    #     self._reset_jobs()
-    #     self._watch_jobs()
-    #     self._process_completed_jobs()
+# def _authenticate_gcloud(self):
+#     subprocess.check_call([
+#         "/google-cloud-sdk/bin/gcloud",
+#         "auth",
+#         "activate-service-account",
+#         "--key-file",
+#         PATHS['service_account']
+#     ])
 
+# def _save_completed_jobs(self, completed_jobs):
+#     with open(f"{self.save_pref}/completed_jobs.txt", 'w') as f:
+#         f.write(completed_jobs)
+
+# def _copy_results_to_local(self):
+#     """Copy results from Google Cloud Storage to local directory.
+#     """
+#     default_url_prefix = self._get_default_url_prefix()
+#     subprocess.check_call([
+#         "/google-cloud-sdk/bin/gcloud",
+#         "storage",
+#         "cp",
+#         f"{default_url_prefix}/ensemble_{self.dt_hash}/*/*.csv",
+#         f"{self.save_pref}/data"
+#     ])
+
+# def run(self):
+#     cmd = self._build_sparkles_command()
+#     print(f"Running sparkles with command: {cmd}")
+#     subprocess.check_call(cmd)
+#     print("Sparkles run complete")
+#     return self.dt_hash
+
+# def validate(self):
+#     print("Validating sparkles run...")
+#     self._watch_jobs()
+#     self._reset_jobs()
+#     self._watch_jobs()
+#     self._process_completed_jobs()
 
 
 class TaigaUploader:
@@ -171,10 +178,10 @@ class TaigaUploader:
 
     def upload_results(self, ipt_dict, model_name, screen_name, output_config):
         """Upload results to Taiga and create output config file.
-        
+
         Args:
             ipt_dict: Input configuration dictionary
-            
+
         Returns:
             tuple: (feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info)
         """
@@ -213,7 +220,7 @@ class TaigaUploader:
             input_config=ipt_dict,
             feature_metadata_id=feature_metadata_taiga_info,
             ensemble_id=ensemble_taiga_info,
-            prediction_matrix_id=predictions_taiga_info
+            prediction_matrix_id=predictions_taiga_info,
         )
 
         output_config_dir = self.save_pref / "output_config_files"
@@ -223,12 +230,11 @@ class TaigaUploader:
         output_config_filename = f"OutputConfig{model_name}{screen_name}.json"
         output_config_file = output_config_dir / output_config_filename
 
-        with open(output_config_file, 'w') as f:
+        with open(output_config_file, "w") as f:
             json.dump(output_config, f, indent=4)
         print(f"Created output config file: {output_config_file}")
 
         return feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info
-
 
 
 @cli.command()
@@ -240,7 +246,7 @@ class TaigaUploader:
 @click.option(
     "--ensemble-config",
     required=False,
-    help='YAML file for model configuration. If not provided, will be auto-generated.',
+    help="YAML file for model configuration. If not provided, will be auto-generated.",
 )
 @click.option(
     "--out",
@@ -284,7 +290,7 @@ def run(
 @click.option(
     "--ensemble-config",
     required=False,
-    help='YAML file for model configuration. If not provided, will be auto-generated.',
+    help="YAML file for model configuration. If not provided, will be auto-generated.",
 )
 @click.option(
     "--out",
@@ -322,16 +328,19 @@ def collect_and_fit(
     save_pref.mkdir(parents=True, exist_ok=True)
     tc = create_taiga_client_v3()
     save_pref.mkdir(parents=True, exist_ok=True)
-    prepare(tc, 
-            ensemble_config,
-            test=test, 
-            restrict_targets_to=restrict_targets_to.split(",") if restrict_targets_to else None, 
-            input_config=input_config, 
-            save_pref=save_pref)
-    
+    prepare(
+        tc,
+        ensemble_config,
+        test=test,
+        restrict_targets_to=(
+            restrict_targets_to.split(",") if restrict_targets_to else None
+        ),
+        input_config=input_config,
+        save_pref=save_pref,
+    )
+
     print("\033[96mMy journey in Daintree has finished.\033[0m")  # Teal
 
 
 if __name__ == "__main__":
     cli()
-    
