@@ -1,10 +1,10 @@
-from .config import FILES, MODEL
+from .config import FILES
 from . import data_processor
 from pathlib import Path
 
 
 def _gather_and_upload(
-    save_pref: Path, ipt_dict: dict, model_name: str, screen_name: str
+    save_pref: Path, ipt_dict: dict, model_name: str, screen_name: str, top_n: int
 ):
     # This could probably be hardcoded and put in a config file. However, I am
     # keeping it this way for now to make it more flexible.
@@ -15,7 +15,7 @@ def _gather_and_upload(
         save_pref,
         features=str(save_pref / FILES["feature_matrix"]),
         targets=str(save_pref / FILES["target_matrix"]),
-        top_n=MODEL["top_n_features"],
+        top_n=top_n,
     )
     df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
     df_predictions.to_csv(save_pref / predictions_filename)

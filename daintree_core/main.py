@@ -323,5 +323,11 @@ def fit_model(
     ensemble.save_results(feature_file_path, predictions_file_path)
 
 
+def run_batch():
+    ...
+
+def gather():
+    ...
+
 if __name__ == "__main__":
     main()

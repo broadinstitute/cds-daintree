@@ -16,10 +16,7 @@ from . import config_manager
 from taigapy import create_taiga_client_v3
 
 from config import (
-    PATHS,
-    CONTAINER,
     FILES,
-    MODEL,
     TEST_LIMIT,
     filter_columns_gene,
     filter_columns_oncref,
@@ -315,12 +312,16 @@ def run(
     type=str,
     help="Comma separated list of names to filter target columns. If not provided, uses TEST_LIMIT from config.py",
 )
+@click.option(
+    "--nfolds", default=5, type=int, help="Number of folds to use in cross validation"
+)
 def collect_and_fit(
     input_config,
     ensemble_config,
-    out=None,
-    test=False,
-    restrict_targets_to=None,
+    out,
+    test,
+    restrict_targets_to,
+    nfolds
 ):
     """Run model fitting with either provided or auto-generated config."""
     save_pref = Path(out) if out else Path.cwd()
@@ -337,6 +338,7 @@ def collect_and_fit(
         ),
         input_config=input_config,
         save_pref=save_pref,
+        nfolds=nfolds
     )
 
     print("\033[96mMy journey in Daintree has finished.\033[0m")  # Teal

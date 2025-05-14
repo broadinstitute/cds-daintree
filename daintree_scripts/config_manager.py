@@ -2,8 +2,7 @@ import json
 from pathlib import Path
 import yaml
 import datetime as dt
-from .config import MODEL
-
+from .config import DEFAULT_JOB_COUNT
 
 def check_file_locs(ipt, config):
     """Check if all files in config exist in input.
@@ -149,7 +148,7 @@ def generate_model_config(input_dict, relation="All"):
         "Features": features,
         "Required": required,
         "Relation": relation,
-        "Jobs": MODEL["default_jobs"],  # Use config value
+        "Jobs": DEFAULT_JOB_COUNT,  # Use config value
     }
 
     if relation == "MatchRelated":

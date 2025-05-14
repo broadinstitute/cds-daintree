@@ -3,7 +3,6 @@ import re
 import pandas as pd
 import csv
 from .prepare import _process_column_name
-from .config import PATHS
 from dataclasses import dataclass
 from typing import Optional, List
 from . import config_manager
@@ -159,6 +158,7 @@ def prepare(
     restrict_targets_to: Optional[List[str]],
     input_config,
     save_pref: Path,
+    nfolds: int
 ):
     ipt_dict = config_manager.load_input_config(input_config)
 
@@ -195,24 +195,21 @@ def prepare(
     data_processor.prepare_data(save_pref, out_rel, config_path)
 
     print("Partitioning inputs...")
-    data_processor.partition_inputs(save_pref, df_dep, config_dict)
+    partitions = data_processor.partition_inputs(df_dep, config_dict)
 
-    _write_parameter_csv(output_file, ranges)
+    output_file = str(save_pref / "partitions.csv")
+    _write_parameter_csv(output_file, partitions, nfolds)
 
+from .data_processor import Partition
+from .config import DAINTREE_BIN_PATH
 
-@dataclass
-class Range:
-    start: int
-    stop: int
-
-
-def _write_parameter_csv(output_file: str, ranges: List[Range]):
+def _write_parameter_csv(output_file: str, partitions: List[Partition], nfolds: int):
     with open(output_file, "wt") as fd:
         w = csv.writer(fd)
         w.writerow(["command"])
-        for start, end, model in ranges:
+        for partition in partitions:
             w.writerow(
                 [
-                    f"{PATHS['daintree_bin']} fit-model --x X.ftr --y target.ftr --model-config model-config.yaml --n-folds {MODEL['n_folds']} --target-range {start} {end} --model {model}"
+                    f"{DAINTREE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config model-config.yaml --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
                 ]
             )

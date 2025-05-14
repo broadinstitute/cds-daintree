@@ -1,14 +1,8 @@
 # Paths to the daintree and sparkles binaries. Also to the service account key for sparkles.
-PATHS = {
-    "daintree_bin": "/install/depmap-py/bin/daintree",
-    "sparkles_bin": "/install/sparkles/bin/sparkles",
-    "service_account": "/root/.sparkles-cache/service-keys/broad-achilles.json",
-}
+DAINTREE_BIN_PATH = "daintree"
 
 # Container image to use for sparkles.
-CONTAINER = {
-    "image": "us.gcr.io/broad-achilles/daintree-sparkles:v1",
-}
+DAINTREE_CONTAINER = "us.gcr.io/broad-achilles/daintree-sparkles:v1"
 
 # Files to save locally.
 FILES = {
@@ -23,10 +17,10 @@ FILES = {
     "predictions": "predictions.csv",
 }
 
-# Model parameters.
-MODEL = {"n_folds": 5, "top_n_features": 50, "default_jobs": 10}
-
+DEFAULT_JOB_COUNT = 10
+ 
 TEST_LIMIT = 5
+
 filter_columns_gene = [
     "Row.name",
     "SOX10",

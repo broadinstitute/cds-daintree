@@ -1,11 +1,12 @@
 import pandas as pd
-from .config import TEST_LIMIT, FILES, PATHS
+from .config import TEST_LIMIT, FILES
 import re
 from pathlib import Path
 import os
 import subprocess
 import numpy as np
 from utils import calculate_feature_correlations, update_taiga
+from .config import DAINTREE_BIN_PATH
 
 
 def _clean_dataframe(df: pd.DataFrame, index_col):
@@ -195,7 +196,6 @@ def process_dependency_data(
 
 def prepare_data(save_pref: Path, out_rel, ensemble_config):
     """Prepare data for model fitting."""
-    daintree_bin = Path(PATHS["daintree_bin"])
     target_matrix = save_pref / FILES["target_matrix"]
     target_matrix_filtered = save_pref / FILES["target_matrix_filtered"]
 
@@ -204,7 +204,7 @@ def prepare_data(save_pref: Path, out_rel, ensemble_config):
     try:
         subprocess.check_call(
             [
-                str(daintree_bin),
+                DAINTREE_BIN_PATH,
                 "prepare-y",
                 "--input",
                 str(target_matrix),
@@ -219,7 +219,7 @@ def prepare_data(save_pref: Path, out_rel, ensemble_config):
     # Note that these parameters are from daintree_package or cds-ensemble
     print('Running "prepare-x"...')
     prep_x_cmd = [
-        str(daintree_bin),
+        DAINTREE_BIN_PATH,
         "prepare-x",
         "--model-config",
         str(ensemble_config),
@@ -240,9 +240,14 @@ def prepare_data(save_pref: Path, out_rel, ensemble_config):
         print(f"Error preparing feature data: {e}")
         raise
 
+from dataclasses import dataclass
+@dataclass
+class Partition:
+    start_index: int
+    end_index: int
+    model_name: str
 
-# TODO: Would like to add seeding in future
-def partition_inputs(save_pref: Path, dep_matrix, ensemble_config):
+def partition_inputs(dep_matrix, ensemble_config):
     """
     Divides the dependency matrix columns (genes) into chunks for parallel processing.
     For each model in the ensemble, it creates partitions based on the number of jobs specified
@@ -258,34 +263,24 @@ def partition_inputs(save_pref: Path, dep_matrix, ensemble_config):
     """
     # Get total number of genes (columns) to partition
     num_genes = dep_matrix.shape[1]
-    start_indices = []
-    end_indices = []
-    models = []
+    partitions : list[Partition] = []
 
     for model_name, model_config in ensemble_config.items():
+        # Note: the parameter is called "jobs" but it's treated here as "the number of genes to process per job"
+        # I'm not going to change that now, but I think this parameter name is misleading.
+
         num_jobs = int(model_config["Jobs"])
-        start_index = np.array(range(0, num_genes, num_jobs))
-        end_index = start_index + num_jobs
+        start_indices = np.array(range(0, num_genes, num_jobs))
+        end_indices = start_indices + num_jobs
 
         # Ensure the last partition includes any remaining genes
-        end_index[-1] = num_genes
+        end_indices[-1] = num_genes
 
         # Store partition boundaries and model names
-        start_indices.append(start_index)
-        end_indices.append(end_index)
-        models.append([model_name] * len(start_index))
+        for start_index, end_index in zip(start_indices, end_indices):
+            partitions.append(Partition(start_index=start_index, end_index=end_index, model_name=model_name))
 
-    param_df = pd.DataFrame(
-        {
-            "start": np.concatenate(start_indices),  # Start index of each partition
-            "end": np.concatenate(end_indices),  # End index of each partition
-            "model": np.concatenate(models),  # Model name for each partition
-        }
-    )
-
-    # Save partition information to CSV file
-    param_df.to_csv(save_pref / FILES["partitions"], index=False)
-
+    return partitions
 
 def gather_ensemble_tasks(
     save_pref: Path, features="X.ftr", targets="target_matrix.ftr", top_n=50
