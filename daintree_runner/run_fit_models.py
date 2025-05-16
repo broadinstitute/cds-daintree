@@ -301,7 +301,7 @@ def run(
 @click.option(
     "--nfolds", default=5, type=int, help="Number of folds to use in cross validation"
 )
-def collect_and_fit(
+def prepare_and_partition(
     input_config,
     ensemble_config,
     out,
@@ -329,6 +329,9 @@ def collect_and_fit(
 
     print("\033[96mMy journey in Daintree has finished.\033[0m")  # Teal
 
+#{DAINTREE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config model-config.yaml --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
+def fit_model(x, y, model_config, nfolds, start, end):
+    raise NotImplementedError()
 
 def main():
     cli()

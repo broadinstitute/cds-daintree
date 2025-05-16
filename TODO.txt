@@ -43,3 +43,9 @@ execute command with environment DAINTREE_NEXT_JSON set
 thunk = {type: "done"} | 
     {type:"command", command: list[str]} | 
     {"type": "sparkles", command: list[str], parameters: str, files_to_upload: list[str], post_command}
+
+
+
+##################
+
+execution starts at collect_and_fit()

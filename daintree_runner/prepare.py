@@ -209,6 +209,6 @@ def _write_parameter_csv(output_file: str, partitions: List[Partition], nfolds: 
         for partition in partitions:
             w.writerow(
                 [
-                    f"{DAINTREE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config model-config.yaml --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
+                    f"{DAINTREE_BIN_PATH} fit-models --x X.ftr --y target.ftr --model-config model-config.yaml --n-folds {nfolds} --start {partition.start_index} --end {partition.end_index}"
                 ]
             )
