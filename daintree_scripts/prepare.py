@@ -2,11 +2,12 @@ from pathlib import Path
 import re
 import pandas as pd
 import csv
-from .prepare import _process_column_name
 from dataclasses import dataclass
 from typing import Optional, List
 from . import config_manager
 from . import data_processor
+from .data_processor import Partition
+from .config import DAINTREE_BIN_PATH
 
 
 def _process_column_name(col, feature_dataset_name):
@@ -200,8 +201,6 @@ def prepare(
     output_file = str(save_pref / "partitions.csv")
     _write_parameter_csv(output_file, partitions, nfolds)
 
-from .data_processor import Partition
-from .config import DAINTREE_BIN_PATH
 
 def _write_parameter_csv(output_file: str, partitions: List[Partition], nfolds: int):
     with open(output_file, "wt") as fd:

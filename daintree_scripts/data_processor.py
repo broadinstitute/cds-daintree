@@ -5,7 +5,7 @@ from pathlib import Path
 import os
 import subprocess
 import numpy as np
-from utils import calculate_feature_correlations, update_taiga
+from .utils import calculate_feature_correlations, update_taiga
 from .config import DAINTREE_BIN_PATH
 
 

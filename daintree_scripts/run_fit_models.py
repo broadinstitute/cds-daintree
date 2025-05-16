@@ -1,27 +1,13 @@
-import os
-import subprocess
 import click
-import re
 import json
-import yaml
-import numpy as np
-import pandas as pd
-import datetime as dt
 from pathlib import Path
-import time
 from .prepare import prepare
 
 from . import config_manager
 
 from taigapy import create_taiga_client_v3
 
-from config import (
-    FILES,
-    TEST_LIMIT,
-    filter_columns_gene,
-    filter_columns_oncref,
-)
-from utils import calculate_feature_correlations, update_taiga
+from .utils import update_taiga
 
 
 # CLI Setup
@@ -344,5 +330,5 @@ def collect_and_fit(
     print("\033[96mMy journey in Daintree has finished.\033[0m")  # Teal
 
 
-if __name__ == "__main__":
+def main():
     cli()
