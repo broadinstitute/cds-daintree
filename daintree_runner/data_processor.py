@@ -6,7 +6,7 @@ import os
 import subprocess
 import numpy as np
 from .utils import calculate_feature_correlations, update_taiga
-from .config import DAINTREE_BIN_PATH
+from .config import DAINTREE_CORE_BIN_PATH
 
 
 def _clean_dataframe(df: pd.DataFrame, index_col):
@@ -153,12 +153,12 @@ def _prepare_partition_paths(
 
 
 def process_dependency_data(
-    tc, save_pref, ipt_dict, *, test=False, restrict_targets_to=None
+    tc, save_pref, runner_config, *, test=False, restrict_targets_to=None
 ):
     """Process dependency matrix data from Taiga and prepare it for model training.
 
     Args:
-        ipt_dict: Dictionary containing input configuration with dataset metadata
+        runner_config: Dictionary containing input configuration with dataset metadata
         test: If True, limits data size for testing purposes
         restrict_targets_to: List of column names to filter the target matrix by
 
@@ -172,7 +172,7 @@ def process_dependency_data(
     dep_matrix_taiga_id = next(
         (
             v.get("taiga_id")
-            for v in ipt_dict["data"].values()
+            for v in runner_config["data"].values()
             if v.get("table_type") == "target_matrix"
         ),
         None,
@@ -204,7 +204,7 @@ def prepare_data(save_pref: Path, out_rel, ensemble_config):
     try:
         subprocess.check_call(
             [
-                DAINTREE_BIN_PATH,
+                DAINTREE_CORE_BIN_PATH,
                 "prepare-y",
                 "--input",
                 str(target_matrix),
@@ -219,7 +219,7 @@ def prepare_data(save_pref: Path, out_rel, ensemble_config):
     # Note that these parameters are from daintree_package or cds-ensemble
     print('Running "prepare-x"...')
     prep_x_cmd = [
-        DAINTREE_BIN_PATH,
+        DAINTREE_CORE_BIN_PATH,
         "prepare-x",
         "--model-config",
         str(ensemble_config),

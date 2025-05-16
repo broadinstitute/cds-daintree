@@ -7,7 +7,7 @@ from typing import Optional, List
 from . import config_manager
 from . import data_processor
 from .data_processor import Partition
-from .config import DAINTREE_BIN_PATH
+from .config import DAINTREE_CORE_BIN_PATH
 
 
 def _process_column_name(col, feature_dataset_name):
@@ -82,11 +82,11 @@ def process_dataset_for_feature_metadata(
 
 
 def generate_feature_metadata(
-    tc, ipt_dict, feature_path_info, related_dset, test=False
+    tc, runner_config, feature_path_info, related_dset, *, test=False
 ):
     """Process feature information for all datasets and generate feature metadata.
     Args:
-        ipt_dict: Input dictionary
+        runner_config: Input dictionary
         feature_path_info: DF with feature dataset names and their corresponding file paths
         related_dset: Related dataset
         test: Test flag
@@ -105,8 +105,8 @@ def generate_feature_metadata(
         ]
     )
 
-    model_name = ipt_dict["model_name"]
-    for dataset_name, dataset_metadata in ipt_dict["data"].items():
+    model_name = runner_config["model_name"]
+    for dataset_name, dataset_metadata in runner_config["data"].items():
         if dataset_metadata["table_type"] not in ["feature", "relation"]:
             continue
 
@@ -132,7 +132,7 @@ def generate_feature_metadata(
 def generate_feature_path_info(save_pref, data: dict[str, dict]):
     """Generate feature path information.
     Args:
-        ipt_dicts: Input dictionaries
+        runner_configs: Input dictionaries
     Returns:
         pd.DataFrame: DF with feature dataset names and their corresponding file paths
     """
@@ -154,38 +154,39 @@ def generate_feature_path_info(save_pref, data: dict[str, dict]):
 
 def prepare(
     tc,
-    ensemble_config,
     test: bool,
     restrict_targets_to: Optional[List[str]],
-    input_config,
+    runner_config_path,
     save_pref: Path,
     nfolds: int
 ):
-    ipt_dict = config_manager.load_input_config(input_config)
+    runner_config = config_manager.load_runner_config(runner_config_path)
 
     # Setup and validate ensemble configuration
-    config_path, config_dict = config_manager.setup_ensemble_config(
-        save_pref, ensemble_config, ipt_dict
+    core_config_path = config_manager.generate_core_config(
+        save_pref, runner_config
     )
 
+    core_config_dict = config_manager.load_and_validate_core_config(core_config_path, runner_config)
+
     print("Generating feature index and files...")
-    feature_path_info = generate_feature_path_info(save_pref, ipt_dict["data"])
+    feature_path_info = generate_feature_path_info(save_pref, runner_config["data"])
 
-    out_rel, related_dset = config_manager.determine_relations(config_dict)
+    out_rel, related_dset = config_manager.determine_relations(core_config_dict)
 
-    model_name = ipt_dict["model_name"]
-    screen_name = ipt_dict["screen_name"]
+    model_name = runner_config["model_name"]
+    screen_name = runner_config["screen_name"]
 
     # This could probably be hardcoded and put in a config file.
     # However, I am keeping it this way for now to make it more flexible.
     feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
-    feature_metadata_df = generate_feature_metadata(
-        ipt_dict, feature_path_info, related_dset, test
+    feature_metadata_df = generate_feature_metadata(tc, 
+        runner_config, feature_path_info, related_dset, test=test
     )
 
     # Process dependency data
     df_dep = data_processor.process_dependency_data(
-        tc, ipt_dict, test, restrict_targets_to=restrict_targets_to
+        tc, save_pref, runner_config, test=test, restrict_targets_to=restrict_targets_to
     )
 
     # Save feature matrix file path information
@@ -193,22 +194,26 @@ def prepare(
     feature_metadata_df.to_csv(save_pref / feature_metadata_filename)
 
     # Prepare data
-    data_processor.prepare_data(save_pref, out_rel, config_path)
+    data_processor.prepare_data(save_pref, out_rel, core_config_path)
 
     print("Partitioning inputs...")
-    partitions = data_processor.partition_inputs(df_dep, config_dict)
+    partitions = data_processor.partition_inputs(df_dep, core_config_dict)
 
     output_file = str(save_pref / "partitions.csv")
-    _write_parameter_csv(output_file, partitions, nfolds)
+    _write_parameter_csv(output_file, partitions, core_config_path, nfolds)
 
 
-def _write_parameter_csv(output_file: str, partitions: List[Partition], nfolds: int):
+def _write_parameter_csv(output_file: str, partitions: List[Partition], core_config_path: str, nfolds: int):
+    # The parameter file being generated is going to contain the command line to execute. So when 
+    # sparkles runs this it will be a csv file named something like "parameters.csv" and
+    # sparkles will be executed as: sparkles run ... --params parameters.csv '{command}'
+
     with open(output_file, "wt") as fd:
         w = csv.writer(fd)
         w.writerow(["command"])
         for partition in partitions:
             w.writerow(
                 [
-                    f"{DAINTREE_BIN_PATH} fit-models --x X.ftr --y target.ftr --model-config model-config.yaml --n-folds {nfolds} --start {partition.start_index} --end {partition.end_index}"
+                    f"{DAINTREE_CORE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config {core_config_path} --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
                 ]
             )

@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def _gather_and_upload(
-    save_pref: Path, ipt_dict: dict, model_name: str, screen_name: str, top_n: int
+    save_pref: Path, runner_config: dict, model_name: str, screen_name: str, top_n: int
 ):
     # This could probably be hardcoded and put in a config file. However, I am
     # keeping it this way for now to make it more flexible.
@@ -22,4 +22,4 @@ def _gather_and_upload(
 
     raise Exception("caller needs to handle upload")
     # if upload_to_taiga:
-    #     taiga_uploader.upload_results(ipt_dict)
+    #     taiga_uploader.upload_results(runner_config)

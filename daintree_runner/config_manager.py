@@ -4,14 +4,12 @@ import yaml
 import datetime as dt
 from .config import DEFAULT_JOB_COUNT
 
-def check_file_locs(ipt, config):
-    """Check if all files in config exist in input.
-    Args:
-        ipt: Input configuration dictionary(Input json file)
-        config: Model configuration dictionary(Generated model-config.yaml file
+def check_file_locs(runner_config, core_config):
     """
-    ipt_features = list(ipt["data"].keys())
-    for model_name, model_config in config.items():
+    Check if all files in core_config exist in runner_config. Throws an assertion error if a problem is found.
+    """
+    ipt_features = list(runner_config["data"].keys())
+    for model_name, model_config in core_config.items():
         f_set = set(model_config.get("Features", []) + model_config.get("Required", []))
         if model_config.get("Relation") not in ["All", "MatchTarget"]:
             f_set.add(model_config.get("Related", ""))
@@ -22,7 +20,7 @@ def check_file_locs(ipt, config):
             ), f"Feature {f} in model config file does not have corresponding input in {model_name}"
 
 
-def load_input_config(input_config):
+def load_runner_config(input_config):
     """Load and validate input configuration.
     Args:
         input_config: Path to input configuration file
@@ -62,28 +60,24 @@ def load_input_config(input_config):
 
     return config
 
+from typing import Optional
 
-def setup_ensemble_config(save_pref: Path, ensemble_config, ipt_dict):
+def generate_core_config(save_pref: Path, runner_config : dict):
     """Setup and validate ensemble configuration.
-    Args:
-        ensemble_config: Path to existing ensemble config or None
-        ipt_dict: Input configuration dictionary
 
-    Returns:
-        tuple: (config_path, config_dict)
+    Returns: config_path 
     """
     print("Setting up ensemble config...")
-    if not ensemble_config:
-        config = generate_model_config(ipt_dict, relation="All")
-        model_config_name = f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
-        config_path = save_config(save_pref, config, model_config_name)
-    else:
-        config_path = ensemble_config
+    config = _generate_core_config(runner_config, relation="All")
+    model_config_name = f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
+    core_config_path = save_config(save_pref, config, model_config_name)
 
-    config_dict = load_config(config_path)
-    check_file_locs(ipt_dict, config_dict)
+    return core_config_path
 
-    return config_path, config_dict
+def load_and_validate_core_config(core_config_path: str, runner_config: dict):
+    core_config_dict = read_yaml_file(core_config_path)
+    check_file_locs(runner_config, core_config_dict)
+    return core_config_dict
 
 
 def save_config(save_pref: Path, config, filename):
@@ -101,7 +95,7 @@ def save_config(save_pref: Path, config, filename):
     return str(config_path)
 
 
-def load_config(config_path):
+def read_yaml_file(config_path):
     """Load model configuration from a file.
     Args:
         config_path: Path to the configuration file
@@ -112,7 +106,7 @@ def load_config(config_path):
         return yaml.load(f, yaml.SafeLoader)
 
 
-def generate_model_config(input_dict, relation="All"):
+def _generate_core_config(input_dict, relation="All"):
     """Generate model configuration.
     Args:
         input_dict: Input dictionary containing model configuration

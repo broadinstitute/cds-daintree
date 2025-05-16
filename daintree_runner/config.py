@@ -1,5 +1,6 @@
-# Paths to the daintree and sparkles binaries. Also to the service account key for sparkles.
-DAINTREE_BIN_PATH = "daintree"
+# Paths to the daintree commands
+DAINTREE_RUNNER_BIN_PATH = "daintree-runner"
+DAINTREE_CORE_BIN_PATH = "daintree-core"
 
 # Container image to use for sparkles.
 DAINTREE_CONTAINER = "us.gcr.io/broad-achilles/daintree-sparkles:v1"

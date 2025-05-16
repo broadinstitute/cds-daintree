@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Daintree Module"
 authors = ["Nayeem Aquib <naquib@broadinsitute.org>"]
 readme = "README.md"
-packages = [{include = "daintree_core"}, {include="daintree_scripts"}]
+packages = [{include = "daintree_core"}, {include="daintree_runner"}]
 
 [tool.poetry.dependencies]
 python = ">3.9,<3.10"
@@ -29,4 +29,5 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-daintree-fit-models="daintree_scripts.run_fit_models:main"
+daintree-runner="daintree_runner.run_fit_models:main"
+daintree-core="daintree_core.main:main"

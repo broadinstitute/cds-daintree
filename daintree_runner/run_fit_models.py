@@ -159,11 +159,11 @@ class TaigaUploader:
         self.save_pref = Path(save_pref)
         self.upload_to_taiga = upload_to_taiga
 
-    def upload_results(self, ipt_dict, model_name, screen_name, output_config):
+    def upload_results(self, runner_config, model_name, screen_name, output_config):
         """Upload results to Taiga and create output config file.
 
         Args:
-            ipt_dict: Input configuration dictionary
+            runner_config: Input configuration dictionary
 
         Returns:
             tuple: (feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info)
@@ -200,7 +200,7 @@ class TaigaUploader:
         print(f"Predictions uploaded to Taiga: {predictions_taiga_info}")
 
         output_config = config_manager.create_output_config(
-            input_config=ipt_dict,
+            input_config=runner_config,
             feature_metadata_id=feature_metadata_taiga_info,
             ensemble_id=ensemble_taiga_info,
             prediction_matrix_id=predictions_taiga_info,
@@ -271,11 +271,6 @@ def run(
     help="Path to JSON config file containing the set of files for prediction",
 )
 @click.option(
-    "--ensemble-config",
-    required=False,
-    help="YAML file for model configuration. If not provided, will be auto-generated.",
-)
-@click.option(
     "--out",
     required=False,
     help="Path to where the data should be stored if not the same directory as the script",
@@ -287,51 +282,55 @@ def run(
     help="Run a test version with limited data",
 )
 @click.option(
-    "--skipfit",
-    default=False,
-    type=bool,
-    help="Only prepare files without fitting (for testing)",
-)
-@click.option(
     "--restrict-targets-to",
     default=None,
     type=str,
     help="Comma separated list of names to filter target columns. If not provided, uses TEST_LIMIT from config.py",
 )
 @click.option(
-    "--nfolds", default=5, type=int, help="Number of folds to use in cross validation"
+    "--nfolds", default=5, type=int, help="Number of folds to use in cross validation (defaults to 5)"
 )
 def prepare_and_partition(
     input_config,
-    ensemble_config,
     out,
     test,
     restrict_targets_to,
     nfolds
 ):
-    """Run model fitting with either provided or auto-generated config."""
-    save_pref = Path(out) if out else Path.cwd()
-    print(f"Save directory path: {save_pref}")
-    save_pref.mkdir(parents=True, exist_ok=True)
-    tc = create_taiga_client_v3()
-    save_pref.mkdir(parents=True, exist_ok=True)
-    prepare(
-        tc,
-        ensemble_config,
-        test=test,
-        restrict_targets_to=(
-            restrict_targets_to.split(",") if restrict_targets_to else None
-        ),
-        input_config=input_config,
-        save_pref=save_pref,
-        nfolds=nfolds
-    )
+    import pdb
+    try:
+        """Run model fitting with either provided or auto-generated config."""
+        save_pref = Path(out) if out else Path.cwd()
+        print(f"Save directory path: {save_pref}")
+        save_pref.mkdir(parents=True, exist_ok=True)
+        tc = create_taiga_client_v3()
+        save_pref.mkdir(parents=True, exist_ok=True)
+        prepare(
+            tc,
+            test=test,
+            restrict_targets_to=(
+                restrict_targets_to.split(",") if restrict_targets_to else None
+            ),
+            runner_config_path=input_config,
+            save_pref=save_pref,
+            nfolds=nfolds
+        )
 
-    print("\033[96mMy journey in Daintree has finished.\033[0m")  # Teal
+        print("\033[96mMy journey in Daintree has finished.\033[0m")  # Teal
+    except Exception as ex:
+        print(f"Unhandled exception: {ex}")
+        pdb.post_mortem()
 
 #{DAINTREE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config model-config.yaml --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
-def fit_model(x, y, model_config, nfolds, start, end):
-    raise NotImplementedError()
+# @cli.command()
+# @click.option(
+#     "--x",
+#     required=True,
+#     help="Path to JSON config file containing the set of files for prediction",
+# )
+# def fit_model(x, y, model_config, nfolds, start, end, model):
+#     # model_config is named this so that the command line parameter is called --model-config, but this really corresponds to core_config_path (Which is to say a daintree_core configuration file)
+#     raise NotImplementedError()
 
 def main():
     cli()
