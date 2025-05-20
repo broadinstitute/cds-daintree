@@ -1,25 +1,62 @@
 from .config import FILES
-from . import data_processor
 from pathlib import Path
+from glob import glob
+import pandas as pd
+import re
 
-
-def _gather_and_upload(
-    save_pref: Path, runner_config: dict, model_name: str, screen_name: str, top_n: int
+def gather(
+        src_dir: str,
+        dst_prefix : str, 
 ):
-    # This could probably be hardcoded and put in a config file. However, I am
-    # keeping it this way for now to make it more flexible.
-    ensemble_filename = f"Ensemble{model_name}{screen_name}.csv"
-    predictions_filename = f"Predictions{model_name}{screen_name}.csv"
+    df_ensemble = read_concatenated_csvs(f"{src_dir}/**/*_features.csv", 0)
+    df_predictions = read_concatenated_csvs(f"{src_dir}/**/*_predictions.csv", 1)
 
-    df_ensemble, df_predictions = data_processor.gather_ensemble_tasks(
-        save_pref,
-        features=str(save_pref / FILES["feature_matrix"]),
-        targets=str(save_pref / FILES["target_matrix"]),
-        top_n=top_n,
+    # Identify best performing model for each target variable
+    df_ensemble = df_ensemble.copy()
+    ranked_pearson = df_ensemble.groupby("target_variable")["pearson"].rank(
+        ascending=False
     )
-    df_ensemble.to_csv(save_pref / ensemble_filename, index=False)
-    df_predictions.to_csv(save_pref / predictions_filename)
+    df_ensemble["best"] = ranked_pearson == 1
 
-    raise Exception("caller needs to handle upload")
-    # if upload_to_taiga:
-    #     taiga_uploader.upload_results(runner_config)
+    # Build final column list including feature information
+    top_n = _get_max_feature_index(df_ensemble.columns)+1
+    ensb_cols = ["target_variable", "model", "pearson", "best"]
+    for i in range(top_n):
+        feature_cols = [
+            f"feature{i}",  # Feature name
+            f"feature{i}_importance",  # Feature importance score
+            f"feature{i}_correlation",  # Feature correlation with target
+        ]
+        ensb_cols.extend(feature_cols)
+
+    # Sort and select final columns
+    df_ensemble = df_ensemble.sort_values(["target_variable", "model"])[ensb_cols]
+
+    ensemble_filename = dst_prefix + "ensemble.csv"
+    predictions_filename = dst_prefix + "predictions.csv"
+
+    print(f"Writing merged {ensemble_filename} and {predictions_filename}")
+    df_ensemble.to_csv(ensemble_filename, index=False)
+    df_predictions.to_csv(predictions_filename, index=False)
+
+def _get_max_feature_index(column_names):
+    values = []
+    for column_name in column_names:
+        m = re.match("feature(\\d+)$", column_name)
+        if m:
+            values.append(int(m.group(1)))
+    return max(values)
+
+def read_concatenated_csvs(
+    wildcard: str,
+    axis: int
+):
+    """
+    Read all csvs that match wildcard and return them as a concatenated pd.DataFrame
+    """
+
+    filenames = glob(wildcard, recursive=True)
+    print(f"Reading {len(filenames)} matching {wildcard}...")
+    dfs = [pd.read_csv(filename) for filename in filenames]
+    return pd.concat(dfs, ignore_index=axis==0, axis=axis)
+

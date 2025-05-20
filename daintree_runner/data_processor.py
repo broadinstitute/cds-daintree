@@ -5,8 +5,15 @@ from pathlib import Path
 import os
 import subprocess
 import numpy as np
-from .utils import calculate_feature_correlations, update_taiga
 from .config import DAINTREE_CORE_BIN_PATH
+from glob import glob
+from dataclasses import dataclass
+
+@dataclass
+class Partition:
+    start_index: int
+    end_index: int
+    model_name: str
 
 
 def _clean_dataframe(df: pd.DataFrame, index_col):
@@ -126,32 +133,6 @@ def _process_dep_matrix(df: pd.DataFrame, test=False, restrict_targets_to=None):
     return df
 
 
-def _prepare_partition_paths(
-    save_pref: Path, partitions_df, data_dir, features_suffix, predictions_suffix
-):
-    partitions_df["path_prefix"] = (
-        data_dir
-        + "/"
-        + partitions_df["model"]
-        + "_"
-        + partitions_df["start"].map(str)
-        + "_"
-        + partitions_df["end"].map(str)
-        + "_"
-    )
-    partitions_df["feature_path"] = save_pref / (
-        partitions_df["path_prefix"] + features_suffix
-    )
-    partitions_df["predictions_path"] = save_pref / (
-        partitions_df["path_prefix"] + predictions_suffix
-    )
-
-    assert all(os.path.exists(f) for f in partitions_df["feature_path"])
-    assert all(os.path.exists(f) for f in partitions_df["predictions_path"])
-
-    return partitions_df
-
-
 def process_dependency_data(
     tc, save_pref, runner_config, *, test=False, restrict_targets_to=None
 ):
@@ -240,12 +221,6 @@ def prepare_data(save_pref: Path, out_rel, ensemble_config):
         print(f"Error preparing feature data: {e}")
         raise
 
-from dataclasses import dataclass
-@dataclass
-class Partition:
-    start_index: int
-    end_index: int
-    model_name: str
 
 def partition_inputs(dep_matrix, ensemble_config):
     """
@@ -282,82 +257,3 @@ def partition_inputs(dep_matrix, ensemble_config):
 
     return partitions
 
-def gather_ensemble_tasks(
-    save_pref: Path, features="X.ftr", targets="target_matrix.ftr", top_n=50
-):
-    """Gather and process ensemble model results, combining predictions and feature importances.
-    Args:
-        features: Path to feature matrix file (default: "X.ftr")
-        targets: Path to target matrix file (default: "target_matrix.ftr")
-        top_n: Number of top features to analyze for correlations (default: 50)
-    Returns:
-        tuple: (ensemble_df, predictions_df)
-            - ensemble_df: DataFrame with model performance and feature importance details
-            - predictions_df: DataFrame containing all model predictions
-    """
-    features_df = pd.read_feather(save_pref / features)
-    targets_df = pd.read_feather(save_pref / targets)
-    targets_df = targets_df.set_index("Row.name")
-    partitions_df = pd.read_csv(save_pref / FILES["partitions"])
-    partitions_df = _prepare_partition_paths(
-        save_pref, partitions_df, "data", "features.csv", "predictions.csv"
-    )
-
-    # Combine feature importance information from all partitions
-    all_features = pd.concat(
-        [pd.read_csv(f) for f in partitions_df["feature_path"]], ignore_index=True
-    )
-    all_features.drop(["score0", "score1", "best"], axis=1, inplace=True)
-
-    # Combine predictions from all partitions
-    predictions = pd.DataFrame().join(
-        [pd.read_csv(f, index_col=0) for f in partitions_df["predictions_path"]],
-        how="outer",
-    )
-
-    # Calculate correlations between predictions and actual values for each model
-    all_cors = []
-    for model in all_features["model"].unique():
-        cors = _process_model_correlations(model, partitions_df, targets_df)
-        all_cors.append(cors)
-
-    # Combine correlation results and merge with feature importance data
-    all_cors = pd.concat(all_cors, ignore_index=True)
-    ensemble = all_features.merge(all_cors, on=["target_variable", "model"])
-
-    # Identify best performing model for each target variable
-    ensemble = ensemble.copy()
-    ranked_pearson = ensemble.groupby("target_variable")["pearson"].rank(
-        ascending=False
-    )
-    ensemble["best"] = ranked_pearson == 1
-
-    ensb_cols = ["target_variable", "model", "pearson", "best"]
-
-    for index, row in ensemble.iterrows():
-        target_variable = row["target_variable"]
-        y = targets_df[target_variable]  # Actual values for this target
-
-        # Process top N(50 at this moment) features
-        for i in range(top_n):
-            feature_col = f"feature{i}"
-            feature_name = row[feature_col]
-
-            # Calculate correlation if feature exists in feature matrix
-            if feature_name in features_df.columns:
-                corr = calculate_feature_correlations(features_df[feature_name], y)
-                ensemble.loc[index, f"{feature_col}_correlation"] = corr
-
-    # Build final column list including feature information
-    for i in range(top_n):
-        feature_cols = [
-            f"feature{i}",  # Feature name
-            f"feature{i}_importance",  # Feature importance score
-            f"feature{i}_correlation",  # Feature correlation with target
-        ]
-        ensb_cols.extend(feature_cols)
-
-    # Sort and select final columns
-    ensemble = ensemble.sort_values(["target_variable", "model"])[ensb_cols]
-
-    return ensemble, predictions
