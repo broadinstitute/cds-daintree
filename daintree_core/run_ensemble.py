@@ -334,7 +334,7 @@ class EnsembleRegressor:
             index=X[0].index,
         )
 
-    def format_results(self, top_n : int, correlation_calc : "LazyCorrelationCalc"):
+    def format_results(self, top_n : int, feature_cor : "LazyCorrelationCalc", prediction_cor: "LazyCorrelationCalc"):
         columns = ["target_variable", "model"]
         for i in range(self.nfolds):
             columns.append(f"score{i}")
@@ -351,6 +351,7 @@ class EnsembleRegressor:
                     "target_variable": target_variable,
                     "model": self.model_types[i]["Name"],
                     "best": self.best_indices[target_variable] == i,
+                    "pearson": prediction_cor.get(target_variable, target_variable)
                 }
                 for j in range(self.nfolds):
                     row["score%i" % j] = self.scores[target_variable][i][j]
@@ -366,7 +367,7 @@ class EnsembleRegressor:
                             target_variable
                         ][i].iloc[j]
                 
-                        row[f"feature{j}_correlation"] = correlation_calc.get(feature_name, target_variable)
+                        row[f"feature{j}_correlation"] = feature_cor.get(feature_name, target_variable)
                     except IndexError:
                         row[f"feature{j}"] = np.nan
                         row[f"feature{j}_importance"] = np.nan
@@ -381,9 +382,10 @@ class EnsembleRegressor:
         assert len(self.predictions) == 1
         assert len(self.model_types) == 1
 
-        correlation_calc = LazyCorrelationCalc(X, Y)
+        feature_corr = LazyCorrelationCalc(X, Y)
+        prediction_corr = LazyCorrelationCalc(self.predictions[0], Y)
 
-        melted = self.format_results(top_n, correlation_calc)
+        melted = self.format_results(top_n, feature_corr, prediction_corr)
         melted.to_csv(feat_outfile, index=None)
 
         # assumes there's a single element in both self.model_types and self.predictions

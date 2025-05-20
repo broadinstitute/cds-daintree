@@ -77,14 +77,21 @@ model_a:
     # process these in one batch
     fit_target(start_index=0, end_index=3)
 
-    # target_1 and 2 should be easy for us to predict, so make sure the RMSE is lowish
-    out_predictions_1 = pd.read_csv(str(output_dir / "model_a_0_3_predictions.csv"), index_col=0)
-    assert rmse(out_predictions_1["T1"], targets["T1"]) < 0.2
-    assert rmse(out_predictions_1["T2"], targets["T2"]) < 0.2
-
+    # read the results
     results_df = pd.read_csv(str(output_dir / "model_a_0_3_features.csv"))
     results = {rec['target_variable']: rec for rec in results_df.to_records()}
     assert len(results) == 3
+    out_predictions_1 = pd.read_csv(str(output_dir / "model_a_0_3_predictions.csv"), index_col=0)
+
+    # target_1 and 2 should be easy for us to predict, so make sure the RMSE is lowish
+    assert rmse(out_predictions_1["T1"], targets["T1"]) < 0.2
+    assert results["T1"]["pearson"] > 0.9
+
+    assert rmse(out_predictions_1["T2"], targets["T2"]) < 0.2
+    assert results["T2"]["pearson"] > 0.9
+    
+    # T3 has a larger stddev, so I'm not sure what RMSE to expect offhand, so only check pearson
+    assert results["T3"]["pearson"] > 0.9
 
     # make sure we've identified F10 as the most important feature for T1, and postively correlated with the output
     t1_results = results["T1"]
