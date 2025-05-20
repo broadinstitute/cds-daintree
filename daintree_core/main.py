@@ -33,9 +33,16 @@ def main():
 )
 @click.option("--gene-filter", help="If specified, will only keep the listed genes")
 def prepare_y(
-    **kwargs
+    input: str,
+    output: str,
+    top_variance_filter: Optional[int],
+    gene_filter: Optional[str],
 ):
-    return prepare_y_command(**kwargs)
+    return prepare_y_command(    input,
+    output,
+    top_variance_filter,
+    gene_filter
+)
 
 def prepare_y_command(
     input: str,
@@ -105,8 +112,20 @@ def prepare_y_command(
     "--output-related",
     help='if specified, write out a file which can be used with "cds-ensemble fit-model --feature-subset ..." to select only related features for each target.',
 )
-def prepare_x(**kwargs): 
-    return prepare_x_command(**kwargs)
+def prepare_x(model_config: str,
+    targets: str,
+    feature_info: str,
+    output: str,
+    confounders: Optional[str],
+    output_format: Optional[str],
+    output_related: Optional[str]): 
+    return prepare_x_command(model_config,
+    targets,
+    feature_info,
+    output,
+    confounders,
+    output_format,
+    output_related)
 
 def prepare_x_command(
     model_config: str,
@@ -221,9 +240,40 @@ def prepare_x_command(
 @click.option("--output-dir", type=str)
 @click.option("--top-n", help="Number of features to write to resulting file (defaults to 50)", type=int, default=50)
 @click.option("--seed", help="random seed (defaults to 0)", type=int, default=0)
-def fit_model(**kwargs
+def fit_model(    x: str,
+    y: str,
+    model_config: str,
+    model: str,
+    task_mode: str,
+    n_folds: int,
+    related_table: Optional[str],
+    feature_metadata: Optional[str],
+    model_valid_samples: Optional[str],
+    valid_samples_file: Optional[str],
+    feature_subset_file: Optional[str],
+    target_range: Optional[Tuple[int, int]],
+    targets: Optional[str],
+    output_dir: Optional[str],
+    top_n: int,
+    seed: int
 ):
-    return fit_model(**kwargs)
+    return fit_model_command(    x,
+    y,
+    model_config,
+    model,
+    task_mode,
+    n_folds,
+    related_table,
+    feature_metadata,
+    model_valid_samples,
+    valid_samples_file,
+    feature_subset_file,
+    target_range,
+    targets,
+    output_dir,
+    top_n,
+    seed
+)
 
 def fit_model_command(
     x: str,
