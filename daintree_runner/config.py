@@ -19,7 +19,7 @@ FILES = {
 }
 
 DEFAULT_JOB_COUNT = 10
- 
+
 TEST_LIMIT = 5
 
 filter_columns_gene = [

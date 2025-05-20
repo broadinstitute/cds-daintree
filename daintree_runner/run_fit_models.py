@@ -125,12 +125,18 @@ def run(
 ):
     pass
 
+
 from .gather import gather as _gather
 
+
 @cli.command()
-@click.option("--dir", required=True, help="Directory to scan for *_features.csv and *_predictions.csv")
+@click.option(
+    "--dir",
+    required=True,
+    help="Directory to scan for *_features.csv and *_predictions.csv",
+)
 @click.option("--dest-prefix", help="Prefix to prepend onto output files", default="")
-def gather(dir,dest_prefix):
+def gather(dir, dest_prefix):
     _gather(dir, dest_prefix)
 
 
@@ -158,16 +164,14 @@ def gather(dir,dest_prefix):
     help="Comma separated list of names to filter target columns. If not provided, uses TEST_LIMIT from config.py",
 )
 @click.option(
-    "--nfolds", default=5, type=int, help="Number of folds to use in cross validation (defaults to 5)"
+    "--nfolds",
+    default=5,
+    type=int,
+    help="Number of folds to use in cross validation (defaults to 5)",
 )
-def prepare_and_partition(
-    input_config,
-    out,
-    test,
-    restrict_targets_to,
-    nfolds
-):
+def prepare_and_partition(input_config, out, test, restrict_targets_to, nfolds):
     import pdb
+
     try:
         """Run model fitting with either provided or auto-generated config."""
         save_pref = Path(out) if out else Path.cwd()
@@ -183,12 +187,13 @@ def prepare_and_partition(
             ),
             runner_config_path=input_config,
             save_pref=save_pref,
-            nfolds=nfolds
+            nfolds=nfolds,
         )
 
     except Exception as ex:
         print(f"Unhandled exception: {ex}")
         pdb.post_mortem()
+
 
 def main():
     cli()

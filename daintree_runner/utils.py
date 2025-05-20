@@ -6,7 +6,6 @@ from taigapy import create_taiga_client_v3
 from typing import Union
 
 
-
 def update_taiga(
     dataset_id: str,
     description_of_changes: str,

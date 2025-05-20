@@ -158,16 +158,16 @@ def prepare(
     restrict_targets_to: Optional[List[str]],
     runner_config_path,
     save_pref: Path,
-    nfolds: int
+    nfolds: int,
 ):
     runner_config = config_manager.load_runner_config(runner_config_path)
 
     # Setup and validate ensemble configuration
-    core_config_path = config_manager.generate_core_config(
-        save_pref, runner_config
-    )
+    core_config_path = config_manager.generate_core_config(save_pref, runner_config)
 
-    core_config_dict = config_manager.load_and_validate_core_config(core_config_path, runner_config)
+    core_config_dict = config_manager.load_and_validate_core_config(
+        core_config_path, runner_config
+    )
 
     print("Generating feature index and files...")
     feature_path_info = generate_feature_path_info(save_pref, runner_config["data"])
@@ -180,8 +180,8 @@ def prepare(
     # This could probably be hardcoded and put in a config file.
     # However, I am keeping it this way for now to make it more flexible.
     feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
-    feature_metadata_df = generate_feature_metadata(tc, 
-        runner_config, feature_path_info, related_dset, test=test
+    feature_metadata_df = generate_feature_metadata(
+        tc, runner_config, feature_path_info, related_dset, test=test
     )
 
     # Process dependency data
@@ -203,8 +203,10 @@ def prepare(
     _write_parameter_csv(output_file, partitions, core_config_path, nfolds)
 
 
-def _write_parameter_csv(output_file: str, partitions: List[Partition], core_config_path: str, nfolds: int):
-    # The parameter file being generated is going to contain the command line to execute. So when 
+def _write_parameter_csv(
+    output_file: str, partitions: List[Partition], core_config_path: str, nfolds: int
+):
+    # The parameter file being generated is going to contain the command line to execute. So when
     # sparkles runs this it will be a csv file named something like "parameters.csv" and
     # sparkles will be executed as: sparkles run ... --params parameters.csv '{command}'
 

@@ -9,6 +9,7 @@ from .config import DAINTREE_CORE_BIN_PATH
 from glob import glob
 from dataclasses import dataclass
 
+
 @dataclass
 class Partition:
     start_index: int
@@ -238,7 +239,7 @@ def partition_inputs(dep_matrix, ensemble_config):
     """
     # Get total number of genes (columns) to partition
     num_genes = dep_matrix.shape[1]
-    partitions : list[Partition] = []
+    partitions: list[Partition] = []
 
     for model_name, model_config in ensemble_config.items():
         # Note: the parameter is called "jobs" but it's treated here as "the number of genes to process per job"
@@ -253,7 +254,10 @@ def partition_inputs(dep_matrix, ensemble_config):
 
         # Store partition boundaries and model names
         for start_index, end_index in zip(start_indices, end_indices):
-            partitions.append(Partition(start_index=start_index, end_index=end_index, model_name=model_name))
+            partitions.append(
+                Partition(
+                    start_index=start_index, end_index=end_index, model_name=model_name
+                )
+            )
 
     return partitions
-

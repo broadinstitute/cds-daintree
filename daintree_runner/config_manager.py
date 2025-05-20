@@ -4,6 +4,7 @@ import yaml
 import datetime as dt
 from .config import DEFAULT_JOB_COUNT
 
+
 def check_file_locs(runner_config, core_config):
     """
     Check if all files in core_config exist in runner_config. Throws an assertion error if a problem is found.
@@ -60,19 +61,24 @@ def load_runner_config(input_config):
 
     return config
 
+
 from typing import Optional
 
-def generate_core_config(save_pref: Path, runner_config : dict):
+
+def generate_core_config(save_pref: Path, runner_config: dict):
     """Setup and validate ensemble configuration.
 
-    Returns: config_path 
+    Returns: config_path
     """
     print("Setting up ensemble config...")
     config = _generate_core_config(runner_config, relation="All")
-    model_config_name = f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
+    model_config_name = (
+        f"model-config_temp_{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}.yaml"
+    )
     core_config_path = save_config(save_pref, config, model_config_name)
 
     return core_config_path
+
 
 def load_and_validate_core_config(core_config_path: str, runner_config: dict):
     core_config_dict = read_yaml_file(core_config_path)

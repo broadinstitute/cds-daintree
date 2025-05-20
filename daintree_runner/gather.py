@@ -4,9 +4,10 @@ from glob import glob
 import pandas as pd
 import re
 
+
 def gather(
-        src_dir: str,
-        dst_prefix : str, 
+    src_dir: str,
+    dst_prefix: str,
 ):
     df_ensemble = read_concatenated_csvs(f"{src_dir}/**/*_features.csv", 0)
     df_predictions = read_concatenated_csvs(f"{src_dir}/**/*_predictions.csv", 1)
@@ -19,7 +20,7 @@ def gather(
     df_ensemble["best"] = ranked_pearson == 1
 
     # Build final column list including feature information
-    top_n = _get_max_feature_index(df_ensemble.columns)+1
+    top_n = _get_max_feature_index(df_ensemble.columns) + 1
     ensb_cols = ["target_variable", "model", "pearson", "best"]
     for i in range(top_n):
         feature_cols = [
@@ -39,6 +40,7 @@ def gather(
     df_ensemble.to_csv(ensemble_filename, index=False)
     df_predictions.to_csv(predictions_filename, index=False)
 
+
 def _get_max_feature_index(column_names):
     values = []
     for column_name in column_names:
@@ -47,10 +49,8 @@ def _get_max_feature_index(column_names):
             values.append(int(m.group(1)))
     return max(values)
 
-def read_concatenated_csvs(
-    wildcard: str,
-    axis: int
-):
+
+def read_concatenated_csvs(wildcard: str, axis: int):
     """
     Read all csvs that match wildcard and return them as a concatenated pd.DataFrame
     """
@@ -58,5 +58,4 @@ def read_concatenated_csvs(
     filenames = glob(wildcard, recursive=True)
     print(f"Reading {len(filenames)} matching {wildcard}...")
     dfs = [pd.read_csv(filename) for filename in filenames]
-    return pd.concat(dfs, ignore_index=axis==0, axis=axis)
-
+    return pd.concat(dfs, ignore_index=axis == 0, axis=axis)

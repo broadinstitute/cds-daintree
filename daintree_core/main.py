@@ -38,11 +38,8 @@ def prepare_y(
     top_variance_filter: Optional[int],
     gene_filter: Optional[str],
 ):
-    return prepare_y_command(    input,
-    output,
-    top_variance_filter,
-    gene_filter
-)
+    return prepare_y_command(input, output, top_variance_filter, gene_filter)
+
 
 def prepare_y_command(
     input: str,
@@ -112,20 +109,25 @@ def prepare_y_command(
     "--output-related",
     help='if specified, write out a file which can be used with "cds-ensemble fit-model --feature-subset ..." to select only related features for each target.',
 )
-def prepare_x(model_config: str,
+def prepare_x(
+    model_config: str,
     targets: str,
     feature_info: str,
     output: str,
     confounders: Optional[str],
     output_format: Optional[str],
-    output_related: Optional[str]): 
-    return prepare_x_command(model_config,
-    targets,
-    feature_info,
-    output,
-    confounders,
-    output_format,
-    output_related)
+    output_related: Optional[str],
+):
+    return prepare_x_command(
+        model_config,
+        targets,
+        feature_info,
+        output,
+        confounders,
+        output_format,
+        output_related,
+    )
+
 
 def prepare_x_command(
     model_config: str,
@@ -238,9 +240,15 @@ def prepare_x_command(
     "--targets", type=str, help="if specified, fit models for targets with these labels"
 )
 @click.option("--output-dir", type=str)
-@click.option("--top-n", help="Number of features to write to resulting file (defaults to 50)", type=int, default=50)
+@click.option(
+    "--top-n",
+    help="Number of features to write to resulting file (defaults to 50)",
+    type=int,
+    default=50,
+)
 @click.option("--seed", help="random seed (defaults to 0)", type=int, default=0)
-def fit_model(    x: str,
+def fit_model(
+    x: str,
     y: str,
     model_config: str,
     model: str,
@@ -255,25 +263,27 @@ def fit_model(    x: str,
     targets: Optional[str],
     output_dir: Optional[str],
     top_n: int,
-    seed: int
+    seed: int,
 ):
-    return fit_model_command(    x,
-    y,
-    model_config,
-    model,
-    task_mode,
-    n_folds,
-    related_table,
-    feature_metadata,
-    model_valid_samples,
-    valid_samples_file,
-    feature_subset_file,
-    target_range,
-    targets,
-    output_dir,
-    top_n,
-    seed
-)
+    return fit_model_command(
+        x,
+        y,
+        model_config,
+        model,
+        task_mode,
+        n_folds,
+        related_table,
+        feature_metadata,
+        model_valid_samples,
+        valid_samples_file,
+        feature_subset_file,
+        target_range,
+        targets,
+        output_dir,
+        top_n,
+        seed,
+    )
+
 
 def fit_model_command(
     x: str,
@@ -291,7 +301,7 @@ def fit_model_command(
     targets: Optional[str],
     output_dir: Optional[str],
     top_n: int,
-    seed: int
+    seed: int,
 ):
     random.seed(seed)
     selected_model_config = read_model_config(model_config)[model]
@@ -391,6 +401,7 @@ def fit_model_command(
 
     print(f"Writing {feature_file_path} and {predictions_file_path}...")
     ensemble.save_results(feature_file_path, predictions_file_path, top_n, X, Y)
+
 
 if __name__ == "__main__":
     main()

@@ -334,24 +334,33 @@ class EnsembleRegressor:
             index=X[0].index,
         )
 
-    def format_results(self, top_n : int, feature_cor : "LazyCorrelationCalc", prediction_cor: "LazyCorrelationCalc"):
+    def format_results(
+        self,
+        top_n: int,
+        feature_cor: "LazyCorrelationCalc",
+        prediction_cor: "LazyCorrelationCalc",
+    ):
         columns = ["target_variable", "model"]
         for i in range(self.nfolds):
             columns.append(f"score{i}")
         columns.append("best")
         for i in range(top_n):
-            columns.extend([f"feature{i}", f"feature{i}_importance", f"feature{i}_correlation"])
+            columns.extend(
+                [f"feature{i}", f"feature{i}_importance", f"feature{i}_correlation"]
+            )
 
         rows = [pd.DataFrame(columns=columns)]
         for target_variable in self.trained_models.keys():
-            assert len(self.model_types) == 1 # the below code is wrong if there's more than one because row will be clobbered
+            assert (
+                len(self.model_types) == 1
+            )  # the below code is wrong if there's more than one because row will be clobbered
             for i in range(len(self.model_types)):
                 # compute the score per fold
                 row = {
                     "target_variable": target_variable,
                     "model": self.model_types[i]["Name"],
                     "best": self.best_indices[target_variable] == i,
-                    "pearson": prediction_cor.get(target_variable, target_variable)
+                    "pearson": prediction_cor.get(target_variable, target_variable),
                 }
                 for j in range(self.nfolds):
                     row["score%i" % j] = self.scores[target_variable][i][j]
@@ -366,8 +375,10 @@ class EnsembleRegressor:
                         row[f"feature{j}_importance"] = self.important_features[
                             target_variable
                         ][i].iloc[j]
-                
-                        row[f"feature{j}_correlation"] = feature_cor.get(feature_name, target_variable)
+
+                        row[f"feature{j}_correlation"] = feature_cor.get(
+                            feature_name, target_variable
+                        )
                     except IndexError:
                         row[f"feature{j}"] = np.nan
                         row[f"feature{j}_importance"] = np.nan
@@ -376,7 +387,6 @@ class EnsembleRegressor:
         melted = pd.concat(rows, ignore_index=True)
         print("Finished formatting results")
         return melted
-
 
     def save_results(self, feat_outfile, pred_outfile, top_n, X, Y):
         assert len(self.predictions) == 1
@@ -395,7 +405,7 @@ class EnsembleRegressor:
 
 
 class LazyCorrelationCalc:
-    def __init__(self, X : pd.DataFrame, Y : pd.DataFrame):
+    def __init__(self, X: pd.DataFrame, Y: pd.DataFrame):
         # reorder the rows so the samples are aligned by a common index
         shared_lines = list(set(X.index) & set(Y.index))
         Y = Y.loc[shared_lines]
@@ -403,8 +413,8 @@ class LazyCorrelationCalc:
 
         self.X = X
         self.Y = Y
-        self.cor_cache = {} # holds values which we've c
-    
+        self.cor_cache = {}  # holds values which we've c
+
     def get(self, x_col, y_col):
         "Compute (or fetch from calc if we've already computed it) the pairwise pearson correlation of X[x_col] and Y[y_col]"
 
@@ -413,7 +423,7 @@ class LazyCorrelationCalc:
             return self.cor_cache[key]
 
         x = self.X[x_col]
-        y = self.Y[y_col]    
+        y = self.Y[y_col]
         mask = ~pd.isna(x) & ~pd.isna(y)
 
         x_filtered = x[mask]
@@ -426,6 +436,7 @@ class LazyCorrelationCalc:
 
         self.cor_cache[key] = corr
         return corr
+
 
 ##############################################################
 ###################  O T H E R  ##############################
@@ -487,7 +498,7 @@ class RelatedFeatureForest(SelfFeatureForest):
         relations: pd.DataFrame,
         feature_metadata: pd.DataFrame,
         reserved_columns: Optional[List[str]] = None,
-        **kwargs
+        **kwargs,
     ):
         SelfFeatureForest.__init__(self, reserved_columns, **kwargs)
         self.relations = relations
