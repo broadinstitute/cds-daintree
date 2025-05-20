@@ -15,6 +15,7 @@ from .parsing_utilities import (
     read_model_config,
     read_feature_info,
 )
+import random
 
 
 @click.group()
@@ -32,6 +33,11 @@ def main():
 )
 @click.option("--gene-filter", help="If specified, will only keep the listed genes")
 def prepare_y(
+    **kwargs
+):
+    return prepare_y_command(**kwargs)
+
+def prepare_y_command(
     input: str,
     output: str,
     top_variance_filter: Optional[int],
@@ -44,7 +50,6 @@ def prepare_y(
         df = read_dataframe(input)
     except FileNotFoundError:
         raise click.ClickException(f"File {input} not found")
-
     except pd.ParserError:
         raise click.ClickException(f"Could not read {input} as CSV")
 
@@ -100,7 +105,10 @@ def prepare_y(
     "--output-related",
     help='if specified, write out a file which can be used with "cds-ensemble fit-model --feature-subset ..." to select only related features for each target.',
 )
-def prepare_x(
+def prepare_x(**kwargs): 
+    return prepare_x_command(**kwargs)
+
+def prepare_x_command(
     model_config: str,
     targets: str,
     feature_info: str,
@@ -109,6 +117,7 @@ def prepare_x(
     output_format: Optional[str],
     output_related: Optional[str],
 ):
+    "This prepare_x_command() function exists so we can call prepare_x directly, bypassing click"
     for p in [model_config, targets, feature_info]:
         if not os.path.exists(p):
             raise click.ClickException(f"File {p} not found")
@@ -145,6 +154,7 @@ def prepare_x(
         feature_metadata.to_csv(f"{file_prefix}_feature_metadata.csv", index=False)
         model_valid_samples.to_csv(f"{file_prefix}_valid_samples.csv")
     else:
+        assert output_format == ".ftr"
         combined_features.reset_index().to_feather(f"{file_prefix}.ftr")
         feature_metadata.reset_index(drop=True).to_feather(
             f"{file_prefix}_feature_metadata.ftr"
@@ -209,13 +219,19 @@ def prepare_x(
     "--targets", type=str, help="if specified, fit models for targets with these labels"
 )
 @click.option("--output-dir", type=str)
-def fit_model(
+@click.option("--top-n", help="Number of features to write to resulting file (defaults to 50)", type=int, default=50)
+@click.option("--seed", help="random seed (defaults to 0)", type=int, default=0)
+def fit_model(**kwargs
+):
+    return fit_model(**kwargs)
+
+def fit_model_command(
     x: str,
     y: str,
     model_config: str,
     model: str,
     task_mode: str,
-    n_folds: Optional[int],
+    n_folds: int,
     related_table: Optional[str],
     feature_metadata: Optional[str],
     model_valid_samples: Optional[str],
@@ -224,7 +240,10 @@ def fit_model(
     target_range: Optional[Tuple[int, int]],
     targets: Optional[str],
     output_dir: Optional[str],
+    top_n: int,
+    seed: int
 ):
+    random.seed(seed)
     selected_model_config = read_model_config(model_config)[model]
     if selected_model_config.relation == "MatchRelated" and related_table is None:
         raise click.ClickException(
@@ -320,14 +339,8 @@ def fit_model(
         feature_file_path = os.path.join(output_dir, feature_file_path)
         predictions_file_path = os.path.join(output_dir, predictions_file_path)
 
-    ensemble.save_results(feature_file_path, predictions_file_path)
-
-
-def run_batch():
-    ...
-
-def gather():
-    ...
+    print(f"Writing {feature_file_path} and {predictions_file_path}...")
+    ensemble.save_results(feature_file_path, predictions_file_path, top_n, X, Y)
 
 if __name__ == "__main__":
     main()

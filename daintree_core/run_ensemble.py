@@ -17,6 +17,7 @@ from typing_extensions import TypedDict
 from .data_models import ModelConfig
 from .exceptions import MalformedGeneLabelException
 from .parsing_utilities import split_gene_label_str
+from scipy.stats import pearsonr
 
 
 def filter_run_ensemble_inputs(
@@ -333,17 +334,19 @@ class EnsembleRegressor:
             index=X[0].index,
         )
 
-    def format_results(self):
+    def format_results(self, top_n : int, correlation_calc : "LazyCorrelationCalc"):
         columns = ["target_variable", "model"]
         for i in range(self.nfolds):
-            columns.append("score%i" % i)
+            columns.append(f"score{i}")
         columns.append("best")
-        for i in range(50):
-            columns.extend(["feature%i" % i, "feature%i_importance" % i])
+        for i in range(top_n):
+            columns.extend([f"feature{i}", f"feature{i}_importance", f"feature{i}_correlation"])
 
-        melted = pd.DataFrame(columns=columns)
+        rows = [pd.DataFrame(columns=columns)]
         for target_variable in self.trained_models.keys():
+            assert len(self.model_types) == 1 # the below code is wrong if there's more than one because row will be clobbered
             for i in range(len(self.model_types)):
+                # compute the score per fold
                 row = {
                     "target_variable": target_variable,
                     "model": self.model_types[i]["Name"],
@@ -351,30 +354,76 @@ class EnsembleRegressor:
                 }
                 for j in range(self.nfolds):
                     row["score%i" % j] = self.scores[target_variable][i][j]
-                for j in range(50):
+
+                # pick the top n features
+                for j in range(top_n):
                     try:
-                        row["feature%i" % j] = self.important_features[target_variable][
+                        feature_name = self.important_features[target_variable][
                             i
                         ].index[j]
-                        row["feature%i_importance" % j] = self.important_features[
+                        row[f"feature{j}"] = feature_name
+                        row[f"feature{j}_importance"] = self.important_features[
                             target_variable
                         ][i].iloc[j]
+                
+                        row[f"feature{j}_correlation"] = correlation_calc.get(feature_name, target_variable)
                     except IndexError:
-                        row["feature%i" % j] = np.nan
-                        row["feature%i_importance" % j] = np.nan
-                melted = pd.concat([melted, pd.DataFrame([row])], ignore_index=True)
+                        row[f"feature{j}"] = np.nan
+                        row[f"feature{j}_importance"] = np.nan
+                        row[f"feature{j}_correlation"] = np.nan
+            rows.append(pd.DataFrame([row]))
+        melted = pd.concat(rows, ignore_index=True)
         print("Finished formatting results")
         return melted
 
-    def save_results(self, feat_outfile, pred_outfile):
-        melted = self.format_results()
+
+    def save_results(self, feat_outfile, pred_outfile, top_n, X, Y):
+        assert len(self.predictions) == 1
+        assert len(self.model_types) == 1
+
+        correlation_calc = LazyCorrelationCalc(X, Y)
+
+        melted = self.format_results(top_n, correlation_calc)
         melted.to_csv(feat_outfile, index=None)
 
-        # This all outputs to a single file. Should this be multiple files, or is there
-        # only one model type/predictions?
+        # assumes there's a single element in both self.model_types and self.predictions
+        # which is asserted at the top of this function
         for model, pred in zip(self.model_types, self.predictions):
             pred.to_csv(pred_outfile, index_label="Row.name")
 
+
+class LazyCorrelationCalc:
+    def __init__(self, X : pd.DataFrame, Y : pd.DataFrame):
+        # reorder the rows so the samples are aligned by a common index
+        shared_lines = list(set(X.index) & set(Y.index))
+        Y = Y.loc[shared_lines]
+        X = X.loc[shared_lines]
+
+        self.X = X
+        self.Y = Y
+        self.cor_cache = {} # holds values which we've c
+    
+    def get(self, x_col, y_col):
+        "Compute (or fetch from calc if we've already computed it) the pairwise pearson correlation of X[x_col] and Y[y_col]"
+
+        key = (x_col, y_col)
+        if key in self.cor_cache:
+            return self.cor_cache[key]
+
+        x = self.X[x_col]
+        y = self.Y[y_col]    
+        mask = ~pd.isna(x) & ~pd.isna(y)
+
+        x_filtered = x[mask]
+        y_filtered = y[mask]
+
+        if len(x_filtered) > 1 and len(y_filtered) > 1:
+            corr, _ = pearsonr(x_filtered, y_filtered)
+        else:
+            corr = np.nan
+
+        self.cor_cache[key] = corr
+        return corr
 
 ##############################################################
 ###################  O T H E R  ##############################
