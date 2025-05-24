@@ -13,6 +13,7 @@ click = "^8.1.7"
 numpy = "^1.25.1"
 scikit-learn = "1.5.1"
 taigapy = {version = "3.8.3", source = "gcp-artifact-registry"}
+gcsfs = "^2025.5.0.post1"
 
 [[tool.poetry.source]]
 name = "gcp-artifact-registry"
@@ -30,5 +31,5 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-daintree-runner="daintree_runner.run_fit_models:main"
+daintree-runner="daintree_runner.main:main"
 daintree-core="daintree_core.main:main"

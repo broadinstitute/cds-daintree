@@ -139,6 +139,11 @@ def prepare_x_command(
     output_related: Optional[str],
 ):
     "This prepare_x_command() function exists so we can call prepare_x directly, bypassing click"
+    print("Patched!!!!!!!!")
+
+    if output_format is None:
+        output_format = ".ftr"
+
     for p in [model_config, targets, feature_info]:
         if not os.path.exists(p):
             raise click.ClickException(f"File {p} not found")
@@ -175,7 +180,7 @@ def prepare_x_command(
         feature_metadata.to_csv(f"{file_prefix}_feature_metadata.csv", index=False)
         model_valid_samples.to_csv(f"{file_prefix}_valid_samples.csv")
     else:
-        assert output_format == ".ftr"
+        assert output_format == ".ftr", f"expected output_format=.ftr but was {output_format}, output={output}"
         combined_features.reset_index().to_feather(f"{file_prefix}.ftr")
         feature_metadata.reset_index(drop=True).to_feather(
             f"{file_prefix}_feature_metadata.ftr"

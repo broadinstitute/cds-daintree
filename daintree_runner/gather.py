@@ -1,6 +1,6 @@
 from .config import FILES
 from pathlib import Path
-from glob import glob
+import fsspec
 import pandas as pd
 import re
 
@@ -55,7 +55,13 @@ def read_concatenated_csvs(wildcard: str, axis: int):
     Read all csvs that match wildcard and return them as a concatenated pd.DataFrame
     """
 
-    filenames = glob(wildcard, recursive=True)
+    fs, path = fsspec.url_to_fs(wildcard)
+    # there's got to be a better way to do this...
+    if wildcard.startswith("gs://"):
+        prefix = "gs://"
+    else:
+        prefix = ""
+    filenames = [prefix+x for x in fs.glob(path)]
     print(f"Reading {len(filenames)} matching {wildcard}...")
     dfs = [pd.read_csv(filename) for filename in filenames]
     return pd.concat(dfs, ignore_index=axis == 0, axis=axis)

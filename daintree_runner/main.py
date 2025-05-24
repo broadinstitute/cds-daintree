@@ -100,9 +100,8 @@ class TaigaUploader:
 )
 @click.option(
     "--test",
-    default=False,
-    type=bool,
-    help="Run a test version with limited data",
+    is_flag=True,
+    help="Run a test by running on a subset of the data",
 )
 @click.option(
     "--upload-to-taiga",
@@ -153,8 +152,7 @@ def gather(dir, dest_prefix):
 )
 @click.option(
     "--test",
-    default=False,
-    type=bool,
+    is_flag=True,
     help="Run a test version with limited data",
 )
 @click.option(
@@ -170,9 +168,9 @@ def gather(dir, dest_prefix):
     help="Number of folds to use in cross validation (defaults to 5)",
 )
 def prepare_and_partition(input_config, out, test, restrict_targets_to, nfolds):
-    import pdb
+    # import pdb
 
-    try:
+    # try:
         """Run model fitting with either provided or auto-generated config."""
         save_pref = Path(out) if out else Path.cwd()
         print(f"Save directory path: {save_pref}")
@@ -190,10 +188,89 @@ def prepare_and_partition(input_config, out, test, restrict_targets_to, nfolds):
             nfolds=nfolds,
         )
 
-    except Exception as ex:
-        print(f"Unhandled exception: {ex}")
-        pdb.post_mortem()
+    # except Exception as ex:
+    #     print(f"Unhandled exception: {ex}")
+    #     pdb.post_mortem()
 
+
+from typing import Optional
+from .config import DAINTREE_CORE_BIN_PATH
+
+@cli.command()
+@click.option(
+    "--config",
+    help="Path to the json daintree model config file",
+    required=True
+)
+@click.option(
+    "--out",
+    help="Path to write workflow to. If not specified, writes to stdout",
+)
+@click.option(
+    "--nfolds",
+    default=5,
+    type=int
+)
+@click.option("--test", is_flag=True, help="Run a test run (subsetting the data to make a fast, but incomplete, run)")
+def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds: int):
+    prepare_command = [
+                    "daintree-runner",
+                    "prepare-and-partition",
+                    "--input-config",
+                    "model_config.json",
+                    "--out",
+                    "out",
+                ]
+    if test:
+        prepare_command.append("--test")
+
+    taiga_token = _find_taiga_token()
+
+    workflow = {
+        "paths_to_localize": [
+        {"src": taiga_token, "dst":".taiga-token"}
+        ],
+        "steps": [
+            {
+                "command": prepare_command,
+                "files_to_localize": [f"model_config.json"],
+            },
+            {
+                # f"{DAINTREE_CORE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config {core_config_path} --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
+                "command": [DAINTREE_CORE_BIN_PATH, "fit-model", "--x", "out/X.ftr", "--y", "out/target_matrix.ftr", "--model-config", "{parameter.model_config}", "--n-folds", str(nfolds), "--target-range", "{parameter.start_index}", "{parameter.end_index}", "--model", "{parameter.model_name}"],
+                "parameters_csv": "{step.1.job_path}/1/out/partitions.csv",
+                  "paths_to_localize": [
+                    {"src": "{step.1.job_path}/1/out", "dst":"out"}
+                ]
+            },
+            {"command": ["daintree-runner", "gather", "--dir", "{step.2.job_path}"]},
+        ],
+        "write_on_completion": [
+            {
+                "expression": {"ensemble_path":
+                                "{step.3.job_path}/1/ensemble.csv",
+                               "predictions_path": 
+                                "{step.3.job_path}/1/predictions.csv"},
+                "filename": "outputs.json"
+            },
+        ],
+    }
+    workflow_json = json.dumps(workflow, indent=2)
+
+    if out:
+        with open(out, "wt") as fd:
+            fd.write(workflow_json)
+    else:
+        print(workflow_json)
+
+import os
+
+def _find_taiga_token():
+    search_path = [".taiga-token", f"{os.environ['HOME']}/.taiga/token"]
+    for path in search_path:
+        if os.path.exists(path):
+            return path
+    raise Exception(f"Could not find taiga token. Checked for it in: {search_path}")
 
 def main():
     cli()
