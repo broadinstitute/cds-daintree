@@ -33,8 +33,8 @@ def gather(
     ensemble_filenames = match_files_by_names(csv_paths, list(partitions["ensemble_filename"]))
     predictions_filenames = match_files_by_names(csv_paths, list(partitions["predictions_filename"]))
 
-    df_ensemble = read_concatenated_csvs(ensemble_filenames ,  0)
-    df_predictions = read_concatenated_csvs(predictions_filenames, 1)
+    df_ensemble = read_row_concatenated_csvs(ensemble_filenames)
+    df_predictions = read_col_concatenated_csvs(predictions_filenames)
 
     # Identify best performing model for each target variable
     df_ensemble = df_ensemble.copy()
@@ -74,12 +74,24 @@ def _get_max_feature_index(column_names):
     return max(values)
 
 
-def read_concatenated_csvs(filenames : list[str], axis: int):
+def read_row_concatenated_csvs(filenames : list[str]):
     """
-    Read all csvs and return them as a concatenated pd.DataFrame
+    Read all csvs and return them as a concatenated pd.DataFrame 
+    Each file will add more rows.
     """
 
-    print(f"Reading {len(filenames)}...")
+    print(f"Reading {len(filenames)} csv files to concat rows...")
 
     dfs = [pd.read_csv(filename) for filename in filenames]
-    return pd.concat(dfs, ignore_index=axis == 0, axis=axis)
+    return pd.concat(dfs, ignore_index=True)
+
+def read_col_concatenated_csvs(filenames : list[str]):
+    """
+    Read all csvs and return them as a concatenated pd.DataFrame
+    Each file will add more columns, and the index will be used to align the rows.
+    """
+
+    print(f"Reading {len(filenames)} csv files to concat cols...")
+
+    dfs = [pd.read_csv(filename, index_col=0) for filename in filenames]
+    return pd.concat(dfs, axis=1)

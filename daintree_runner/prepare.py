@@ -176,12 +176,6 @@ def prepare(
 
     out_rel, related_dset = config_manager.determine_relations(core_config_dict)
 
-    model_name = runner_config["model_name"]
-    screen_name = runner_config["screen_name"]
-
-    # This could probably be hardcoded and put in a config file.
-    # However, I am keeping it this way for now to make it more flexible.
-    feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
     feature_metadata_df = generate_feature_metadata(
         tc, runner_config, feature_path_info, related_dset, test=test
     )
@@ -193,7 +187,7 @@ def prepare(
 
     # Save feature matrix file path information
     feature_path_info.to_csv(save_pref / "feature_path_info.csv")
-    feature_metadata_df.to_csv(save_pref / feature_metadata_filename)
+    feature_metadata_df.to_csv(save_pref / "feature_metadata.csv")
 
     # Prepare data
     data_processor.prepare_data(save_pref, out_rel, core_config_path)
