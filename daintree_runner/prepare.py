@@ -159,6 +159,8 @@ def prepare(
     runner_config_path,
     save_pref: Path,
     nfolds: int,
+    models_per_task: int,
+    test_first_n_tasks : Optional[int]
 ):
     runner_config = config_manager.load_runner_config(runner_config_path)
 
@@ -197,7 +199,11 @@ def prepare(
     data_processor.prepare_data(save_pref, out_rel, core_config_path)
 
     print("Partitioning inputs...")
-    partitions = data_processor.partition_inputs(df_dep, core_config_dict)
+    partitions = data_processor.partition_inputs(df_dep, core_config_dict, models_per_task)
+
+    if test_first_n_tasks is not None:
+        print(f"Limiting run to the first {test_first_n_tasks} tasks")
+        partitions = partitions[:test_first_n_tasks]
 
     output_file = str(save_pref / "partitions.csv")
     _write_parameter_csv(output_file, partitions, core_config_path, nfolds)
@@ -212,11 +218,12 @@ def _write_parameter_csv(
 
     with open(output_file, "wt") as fd:
         w = csv.writer(fd)
-        w.writerow(["model_config", "start_index", "end_index", "model_name"])
+        w.writerow(["model_config", "start_index", "end_index", "model_name", "predictions_filename", "ensemble_filename"])
         for partition in partitions:
             w.writerow(
                 [
                     # f"{DAINTREE_CORE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config {core_config_path} --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
-                    core_config_path, partition.start_index, partition.end_index, partition.model_name
+                    core_config_path, partition.start_index, partition.end_index, partition.model_name,
+                    f"{partition.model_name}_{partition.start_index}_{partition.end_index}_predictions.csv", f"{partition.model_name}_{partition.start_index}_{partition.end_index}_features.csv"
                 ]
             )

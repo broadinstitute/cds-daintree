@@ -131,12 +131,13 @@ from .gather import gather as _gather
 @cli.command()
 @click.option(
     "--dir",
-    required=True,
+    default=".",
     help="Directory to scan for *_features.csv and *_predictions.csv",
 )
 @click.option("--dest-prefix", help="Prefix to prepend onto output files", default="")
-def gather(dir, dest_prefix):
-    _gather(dir, dest_prefix)
+@click.argument("partitions_csv")
+def gather(partitions_csv, dir, dest_prefix):
+    _gather(dir, dest_prefix, partitions_csv)
 
 
 @cli.command()
@@ -156,6 +157,11 @@ def gather(dir, dest_prefix):
     help="Run a test version with limited data",
 )
 @click.option(
+    "--test-first-n-tasks",
+    type=int,
+    help="If set, will only run a max of N tasks (for testing)"    
+)
+@click.option(
     "--restrict-targets-to",
     default=None,
     type=str,
@@ -167,7 +173,13 @@ def gather(dir, dest_prefix):
     type=int,
     help="Number of folds to use in cross validation (defaults to 5)",
 )
-def prepare_and_partition(input_config, out, test, restrict_targets_to, nfolds):
+@click.option(
+    "--models-per-task",
+    default=10,
+    type=int,
+    help="The number of models to fit per each sparkles task"
+)
+def prepare_and_partition(input_config, out, test, restrict_targets_to, nfolds, models_per_task, test_first_n_tasks):
     # import pdb
 
     # try:
@@ -186,6 +198,8 @@ def prepare_and_partition(input_config, out, test, restrict_targets_to, nfolds):
             runner_config_path=input_config,
             save_pref=save_pref,
             nfolds=nfolds,
+            models_per_task=models_per_task,
+            test_first_n_tasks=test_first_n_tasks
         )
 
     # except Exception as ex:
@@ -211,8 +225,19 @@ from .config import DAINTREE_CORE_BIN_PATH
     default=5,
     type=int
 )
+@click.option(
+    "--models-per-task",
+    default=10,
+    type=int,
+    help="The number of models to fit per each sparkles task"
+)
+@click.option(
+    "--test-first-n-tasks",
+    type=int,
+    help="If set, will only run a max of N tasks (for testing)"    
+)
 @click.option("--test", is_flag=True, help="Run a test run (subsetting the data to make a fast, but incomplete, run)")
-def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds: int):
+def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds: int, models_per_task: int, test_first_n_tasks:Optional[int]):
     prepare_command = [
                     "daintree-runner",
                     "prepare-and-partition",
@@ -220,7 +245,9 @@ def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds
                     "model_config.json",
                     "--out",
                     "out",
-                ]
+                    "--models-per-task",
+                    str(models_per_task)
+                ] + (["--test-first-n-tasks", str(test_first_n_tasks)] if test_first_n_tasks else [])
     if test:
         prepare_command.append("--test")
 

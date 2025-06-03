@@ -139,7 +139,6 @@ def prepare_x_command(
     output_related: Optional[str],
 ):
     "This prepare_x_command() function exists so we can call prepare_x directly, bypassing click"
-    print("Patched!!!!!!!!")
 
     if output_format is None:
         output_format = ".ftr"

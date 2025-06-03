@@ -223,7 +223,7 @@ def prepare_data(save_pref: Path, out_rel, ensemble_config):
         raise
 
 
-def partition_inputs(dep_matrix, ensemble_config):
+def partition_inputs(dep_matrix, ensemble_config, models_per_task):
     """
     Divides the dependency matrix columns (genes) into chunks for parallel processing.
     For each model in the ensemble, it creates partitions based on the number of jobs specified
@@ -245,7 +245,7 @@ def partition_inputs(dep_matrix, ensemble_config):
         # Note: the parameter is called "jobs" but it's treated here as "the number of genes to process per job"
         # I'm not going to change that now, but I think this parameter name is misleading.
 
-        num_jobs = int(model_config["Jobs"])
+        num_jobs = models_per_task
         start_indices = np.array(range(0, num_genes, num_jobs))
         end_indices = start_indices + num_jobs
 
