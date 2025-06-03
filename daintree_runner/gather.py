@@ -62,7 +62,7 @@ def gather(
 
     print(f"Writing merged {ensemble_filename} and {predictions_filename}")
     df_ensemble.to_csv(ensemble_filename, index=False)
-    df_predictions.to_csv(predictions_filename, index=False)
+    df_predictions.to_csv(predictions_filename, index=True)
 
 
 def _get_max_feature_index(column_names):
