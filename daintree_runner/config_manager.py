@@ -61,10 +61,6 @@ def load_runner_config(input_config):
 
     return config
 
-
-from typing import Optional
-
-
 def generate_core_config(save_pref: Path, runner_config: dict):
     """Setup and validate ensemble configuration.
 
@@ -189,39 +185,3 @@ def determine_relations(config_dict):
 
     return out_rel, related_dset
 
-
-def create_output_config(
-    input_config, feature_metadata_id, ensemble_id, prediction_matrix_id
-):
-    """Create output configuration JSON file.
-
-    Args:
-        model_name: Name of the model
-        screen_name: Name of the screen
-        input_config: Input configuration
-        feature_metadata_id: Taiga ID for feature metadata csv file
-        ensemble_id: Taiga ID for ensemble csv file
-        prediction_matrix_id: Taiga ID for prediction matrix csv file
-
-    Returns:
-        dict: Daintree output configuration dictionary
-    """
-    model_name = input_config["model_name"]
-    screen_name = input_config["screen_name"]
-    data = input_config["data"]
-
-    config = {
-        model_name: {
-            "input": {
-                "model_name": model_name,
-                "screen_name": screen_name,
-                "data": data,
-            },
-            "output": {
-                "ensemble_taiga_id": ensemble_id,
-                "feature_metadata_taiga_id": feature_metadata_id,
-                "prediction_matrix_taiga_id": prediction_matrix_id,
-            },
-        }
-    }
-    return config

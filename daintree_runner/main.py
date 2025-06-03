@@ -2,84 +2,14 @@ import click
 import json
 from pathlib import Path
 from .prepare import prepare
-
-from . import config_manager
-
 from taigapy import create_taiga_client_v3
-
-from .utils import update_taiga
+import os
 
 
 # CLI Setup
 @click.group()
 def cli():
     pass
-
-
-class TaigaUploader:
-    def __init__(self, save_pref, upload_to_taiga):
-        self.save_pref = Path(save_pref)
-        self.upload_to_taiga = upload_to_taiga
-
-    def upload_results(self, runner_config, model_name, screen_name, output_config):
-        """Upload results to Taiga and create output config file.
-
-        Args:
-            runner_config: Input configuration dictionary
-
-        Returns:
-            tuple: (feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info)
-        """
-        feature_metadata_filename = f"FeatureMetadata{model_name}{screen_name}.csv"
-        ensemble_filename = f"Ensemble{model_name}{screen_name}.csv"
-        predictions_filename = f"Predictions{model_name}{screen_name}.csv"
-
-        feature_metadata_taiga_info = update_taiga(
-            self.upload_to_taiga,
-            f"Updated Feature Metadata for Model: {model_name} and Screen: {screen_name}",
-            f"FeatureMetadata{model_name}{screen_name}",
-            self.save_pref / feature_metadata_filename,
-            "csv_table",
-        )
-        print(f"Feature Metadata uploaded to Taiga: {feature_metadata_taiga_info}")
-
-        ensemble_taiga_info = update_taiga(
-            self.upload_to_taiga,
-            f"Updated Ensemble for Model: {model_name} and Screen: {screen_name}",
-            f"Ensemble{model_name}{screen_name}",
-            self.save_pref / ensemble_filename,
-            "csv_table",
-        )
-        print(f"Ensemble uploaded to Taiga: {ensemble_taiga_info}")
-
-        predictions_taiga_info = update_taiga(
-            self.upload_to_taiga,
-            f"Updated Predictions for Model: {model_name} and Screen: {screen_name}",
-            f"Predictions{model_name}{screen_name}",
-            self.save_pref / predictions_filename,
-            "csv_table",
-        )
-        print(f"Predictions uploaded to Taiga: {predictions_taiga_info}")
-
-        output_config = config_manager.create_output_config(
-            input_config=runner_config,
-            feature_metadata_id=feature_metadata_taiga_info,
-            ensemble_id=ensemble_taiga_info,
-            prediction_matrix_id=predictions_taiga_info,
-        )
-
-        output_config_dir = self.save_pref / "output_config_files"
-        output_config_dir.mkdir(parents=True, exist_ok=True)
-        # This could probably be hardcoded and put in a config file.
-        # However, I am keeping it this way for now to make it more flexible.
-        output_config_filename = f"OutputConfig{model_name}{screen_name}.json"
-        output_config_file = output_config_dir / output_config_filename
-
-        with open(output_config_file, "w") as f:
-            json.dump(output_config, f, indent=4)
-        print(f"Created output config file: {output_config_file}")
-
-        return feature_metadata_taiga_info, ensemble_taiga_info, predictions_taiga_info
 
 
 @cli.command()
@@ -290,7 +220,6 @@ def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds
     else:
         print(workflow_json)
 
-import os
 
 def _find_taiga_token():
     search_path = [".taiga-token", f"{os.environ['HOME']}/.taiga/token"]
