@@ -103,7 +103,7 @@ model_a:
     t2_results = results["T2"]
     assert t2_results["feature0"] == "F10_F"
     assert 0.90 < t2_results["feature0_importance"] <= 1.0 
-    assert -0.90 > t2_results["feature0_correlation"] <= -1.0
+    assert -0.90 > t2_results["feature0_correlation"] >= -1.0
 
     # make sure we've identified F10 and F11 as the most important features for T3
     t3_results = results["T3"]
