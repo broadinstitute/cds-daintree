@@ -36,6 +36,9 @@ def gather(
     df_ensemble = read_row_concatenated_csvs(ensemble_filenames)
     df_predictions = read_col_concatenated_csvs(predictions_filenames)
 
+    timings_csv_paths = find_files(f"{src_dir}/**/timings.csv")
+    df_timings = read_row_concatenated_csvs(timings_csv_paths)
+
     # Identify best performing model for each target variable
     df_ensemble = df_ensemble.copy()
     ranked_pearson = df_ensemble.groupby("target_variable")["pearson"].rank(
@@ -59,11 +62,12 @@ def gather(
 
     ensemble_filename = dst_prefix + "ensemble.csv"
     predictions_filename = dst_prefix + "predictions.csv"
+    timings_filename = dst_prefix + "timings.csv"
 
-    print(f"Writing merged {ensemble_filename} and {predictions_filename}")
+    print(f"Writing merged {ensemble_filename} and {predictions_filename} and {timings_filename}")
     df_ensemble.to_csv(ensemble_filename, index=False)
     df_predictions.to_csv(predictions_filename, index=True)
-
+    df_timings.to_csv(timings_filename, index=False)
 
 def _get_max_feature_index(column_names):
     values = []

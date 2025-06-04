@@ -16,7 +16,7 @@ from .parsing_utilities import (
     read_feature_info,
 )
 import random
-
+from time import time
 
 @click.group()
 def main():
@@ -307,6 +307,7 @@ def fit_model_command(
     top_n: int,
     seed: int,
 ):
+    start_time = time()
     random.seed(seed)
     selected_model_config = read_model_config(model_config)[model]
     if selected_model_config.relation == "MatchRelated" and related_table is None:
@@ -382,6 +383,7 @@ def fit_model_command(
         raise click.ClickException(str(e))
 
     # start_col, end_col not passed in because X, Y already filtered
+    fit_start = time()
     ensemble = run_model(
         X=X,
         Y=Y,
@@ -392,6 +394,7 @@ def fit_model_command(
         feature_metadata=feature_metadata_df,
     )
 
+    write_start = time()
     feature_file_path = (
         f"{selected_model_config.name}_{start_col}_{end_col}_features.csv"
     )
@@ -405,6 +408,17 @@ def fit_model_command(
 
     print(f"Writing {feature_file_path} and {predictions_file_path}...")
     ensemble.save_results(feature_file_path, predictions_file_path, top_n, X, Y)
+
+    task_end = time()
+    # recording the elapsed timings 
+    timings_df = pd.DataFrame([{"model": model, 
+                               "start_col": start_col,
+                               "end_col": end_col,
+                               "startup_secs": fit_start-start_time, 
+                               "fit_secs": write_start-fit_start, 
+                               "write_secs": task_end-write_start, 
+                               "target_count": Y.shape[1]}])
+    timings_df.to_csv(f"timings.csv",index=False)
 
 
 if __name__ == "__main__":
