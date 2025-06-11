@@ -17,6 +17,7 @@ from .parsing_utilities import (
 )
 import random
 from time import time
+import resource
 
 @click.group()
 def main():
@@ -410,6 +411,7 @@ def fit_model_command(
     ensemble.save_results(feature_file_path, predictions_file_path, top_n, X, Y)
 
     task_end = time()
+    max_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     # recording the elapsed timings 
     timings_df = pd.DataFrame([{"model": model, 
                                "start_col": start_col,
@@ -417,7 +419,8 @@ def fit_model_command(
                                "startup_secs": fit_start-start_time, 
                                "fit_secs": write_start-fit_start, 
                                "write_secs": task_end-write_start, 
-                               "target_count": Y.shape[1]}])
+                               "target_count": Y.shape[1],
+                               "max_rss":max_rss}])
     timings_df.to_csv(f"timings.csv",index=False)
 
 
