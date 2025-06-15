@@ -40,7 +40,6 @@ def process_dataset_for_feature_metadata(
     dataset_metadata,
     model_name,
     related_dset,
-    test=False,
 ):
     """Process a single dataset and generate feature metadata.
     Args:
@@ -59,7 +58,7 @@ def process_dataset_for_feature_metadata(
     if (related_dset is None) or (
         (related_dset is not None) and dataset_name != related_dset
     ):
-        _df = data_processor.process_biomarker_matrix(_df, 0, test)
+        _df = data_processor.process_biomarker_matrix(_df, 0)
     print("\033[92m================================================")  # Green
     print(f"Processed Feature Dataset: {dataset_name}")
     print("================================================\033[0m")
@@ -82,7 +81,7 @@ def process_dataset_for_feature_metadata(
 
 
 def generate_feature_metadata(
-    tc, runner_config, feature_path_info, related_dset, *, test=False
+    tc, runner_config, feature_path_info, related_dset, *, test_first_n_models : Optional[int]=None 
 ):
     """Process feature information for all datasets and generate feature metadata.
     Args:
@@ -117,7 +116,6 @@ def generate_feature_metadata(
             dataset_metadata,
             model_name,
             related_dset,
-            test,
         )
         # Concatenate the feature metadata for all datasets
         feature_metadata_df = pd.concat(
@@ -154,13 +152,13 @@ def generate_feature_path_info(save_pref, data: dict[str, dict]):
 
 def prepare(
     tc,
-    test: bool,
+    test_first_n_models: Optional[int],
     restrict_targets_to: Optional[List[str]],
     runner_config_path,
     save_pref: Path,
     nfolds: int,
     models_per_task: int,
-    test_first_n_tasks : Optional[int]
+    test_first_n_tasks : Optional[int],
 ):
     runner_config = config_manager.load_runner_config(runner_config_path)
 
@@ -177,19 +175,19 @@ def prepare(
     out_rel, related_dset = config_manager.determine_relations(core_config_dict)
 
     feature_metadata_df = generate_feature_metadata(
-        tc, runner_config, feature_path_info, related_dset, test=test
+        tc, runner_config, feature_path_info, related_dset, test_first_n_models=test_first_n_models
     )
 
-    # Process dependency data
+    # Process dependency data writing out (unfiltered) target ftr file
     df_dep = data_processor.process_dependency_data(
-        tc, save_pref, runner_config, test=test, restrict_targets_to=restrict_targets_to
+        tc, save_pref, runner_config, test_first_n_models=test_first_n_models, restrict_targets_to=restrict_targets_to
     )
 
     # Save feature matrix file path information
     feature_path_info.to_csv(save_pref / "feature_path_info.csv")
     feature_metadata_df.to_csv(save_pref / "feature_metadata.csv")
 
-    # Prepare data
+    # Prepare data by filtering targets
     data_processor.prepare_data(save_pref, out_rel, core_config_path)
 
     print("Partitioning inputs...")

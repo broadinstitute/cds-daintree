@@ -75,7 +75,7 @@ def _process_model_correlations(model, partitions_df, targets_df):
     return cors
 
 
-def process_biomarker_matrix(df: pd.DataFrame, index_col: int = 0, test: bool = False):
+def process_biomarker_matrix(df: pd.DataFrame, index_col: int = 0):
     """Process biomarker matrix data.
     Args:
         df: Biomarker matrix dataframe
@@ -86,14 +86,13 @@ def process_biomarker_matrix(df: pd.DataFrame, index_col: int = 0, test: bool = 
     """
     print("Start Processing Biomarker Matrix")
     df = _clean_dataframe(df, index_col)
-    # if test:
-    #     df = df.iloc[:, :TEST_LIMIT]
     print("End Processing Biomarker Matrix")
 
     return df
 
+from typing import Optional, List
 
-def _process_dep_matrix(df: pd.DataFrame, test=False, restrict_targets_to=None):
+def _process_dep_matrix(df: pd.DataFrame, test_first_n_models:Optional[int], restrict_targets_to: Optional[List[str]]):
     """Process dependency matrix data.
     Args:
         df: Dependency matrix dataframe
@@ -105,14 +104,11 @@ def _process_dep_matrix(df: pd.DataFrame, test=False, restrict_targets_to=None):
     print("Start Processing Dependency Matrix")
     df = df.dropna(how="all", axis=0)
     df = df.dropna(how="all", axis=1)
-    df.index.name = "Row.name"
-    df = df.reset_index()
-
-    if test:
+ 
+    if test_first_n_models is not None:
         print("\033[93mWarning: Truncating datasets for testing...\033[0m")  # Yellow
         # If no specific targets, apply column filtering
         if restrict_targets_to:
-            restrict_targets_to.insert(0, "Row.name")
             pattern = (
                 r"\b("
                 + "|".join(re.escape(col) for col in restrict_targets_to)
@@ -121,9 +117,8 @@ def _process_dep_matrix(df: pd.DataFrame, test=False, restrict_targets_to=None):
             mask = df.columns.str.contains(pattern, regex=True)
             df = df.loc[:, mask]
         else:
-            # If no filter columns provided, take first TEST_LIMIT+1 columns
-            # (+1 because first column is Row.name)
-            df = df.iloc[:, : TEST_LIMIT + 1]
+            # If no filter columns provided, take first test_first_n_models columns
+            df = df.iloc[:, : test_first_n_models]
     else:
         print(
             "\033[93mWarning: Not truncating datasets. This may take a while...\033[0m"
@@ -133,9 +128,10 @@ def _process_dep_matrix(df: pd.DataFrame, test=False, restrict_targets_to=None):
 
     return df
 
+from typing import Optional
 
 def process_dependency_data(
-    tc, save_pref, runner_config, *, test=False, restrict_targets_to=None
+    tc, save_pref, runner_config, *, test_first_n_models:Optional[int], restrict_targets_to:Optional[List[str]]
 ):
     """Process dependency matrix data from Taiga and prepare it for model training.
 
@@ -162,7 +158,7 @@ def process_dependency_data(
 
     df_dep = tc.get(dep_matrix_taiga_id)
 
-    df_dep = _process_dep_matrix(df_dep, test, restrict_targets_to=restrict_targets_to)
+    df_dep = _process_dep_matrix(df_dep, test_first_n_models, restrict_targets_to)
 
     print("\033[92m================================================")  # Green
     print(f"Processed Target Matrix")
@@ -170,10 +166,15 @@ def process_dependency_data(
     print(df_dep.head())
 
     # Save the processed matrix
-    df_dep.to_csv(save_pref / FILES["target_matrix"])
-    df_dep.to_feather(save_pref / FILES["target_matrix"])
+    write_feather_df_with_index(df_dep, save_pref / FILES["target_matrix"])
 
     return df_dep
+
+def write_feather_df_with_index(df, filename):
+    df = df.copy() 
+    df.index.name = "Row.name"
+    df = df.reset_index()
+    df.to_feather(filename)
 
 
 def prepare_data(save_pref: Path, out_rel, ensemble_config):
@@ -245,9 +246,8 @@ def partition_inputs(dep_matrix, ensemble_config, models_per_task):
         # Note: the parameter is called "jobs" but it's treated here as "the number of genes to process per job"
         # I'm not going to change that now, but I think this parameter name is misleading.
 
-        num_jobs = models_per_task
-        start_indices = np.array(range(0, num_genes, num_jobs))
-        end_indices = start_indices + num_jobs
+        start_indices = np.array(range(0, num_genes, models_per_task))
+        end_indices = start_indices + models_per_task
 
         # Ensure the last partition includes any remaining genes
         end_indices[-1] = num_genes

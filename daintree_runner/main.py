@@ -82,9 +82,10 @@ def gather(partitions_csv, dir, dest_prefix):
     help="Path to where the data should be stored if not the same directory as the script",
 )
 @click.option(
-    "--test",
-    is_flag=True,
-    help="Run a test version with limited data",
+    "--test-first-n-models",
+    type=int,
+    default=None,
+    help="If set, will only run a max of the first N models (for testing)",
 )
 @click.option(
     "--test-first-n-tasks",
@@ -109,7 +110,7 @@ def gather(partitions_csv, dir, dest_prefix):
     type=int,
     help="The number of models to fit per each sparkles task"
 )
-def prepare_and_partition(input_config, out, test, restrict_targets_to, nfolds, models_per_task, test_first_n_tasks):
+def prepare_and_partition(input_config, out, test_first_n_models, restrict_targets_to, nfolds, models_per_task, test_first_n_tasks):
     # import pdb
 
     # try:
@@ -121,7 +122,7 @@ def prepare_and_partition(input_config, out, test, restrict_targets_to, nfolds, 
         save_pref.mkdir(parents=True, exist_ok=True)
         prepare(
             tc,
-            test=test,
+            test_first_n_models=test_first_n_models,
             restrict_targets_to=(
                 restrict_targets_to.split(",") if restrict_targets_to else None
             ),
