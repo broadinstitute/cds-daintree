@@ -2,8 +2,10 @@ import pandas as pd
 import numpy as np
 
 from daintree_core.main import prepare_x_command, prepare_y_command, fit_model_command
+import pytest
 
-def test_prepare_and_fit(tmp_path):
+@pytest.mark.parametrize("output_format", [".csv", ".ftr"])
+def test_prepare_and_fit(tmp_path, output_format):
     n_samples = 1000
     n_features = 50
 
@@ -47,17 +49,17 @@ model_a:
   Jobs: 10
 """)
 
-    prepare_x_command(str(model_config_path), str(targets_path), str(features_info_path), str(x_path), confounders=None, output_format=".csv", output_related=None)
+    prepare_x_command(str(model_config_path), str(targets_path), str(features_info_path), str(x_path), confounders=None, output_format=output_format, output_related=None)
 
     prepare_y_command(
         str(targets_path),
-        str(y_path),
+        str(y_path)+output_format,
         top_variance_filter=None,
         gene_filter=None)
 
     def fit_target(start_index, end_index):
-        fit_model_command(str(x_path)+".csv",
-            str(y_path),
+        fit_model_command(str(x_path)+output_format,
+            str(y_path)+output_format,
             str(model_config_path),
             "model_a",
             "regress",
