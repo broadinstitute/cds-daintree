@@ -4,6 +4,10 @@ import fsspec
 import pandas as pd
 import re
 import os
+from google.cloud import storage
+from tqdm import tqdm
+import tempfile
+from concurrent.futures import ProcessPoolExecutor
 
 def match_files_by_names(full_paths: list[str], filenames: list[str]):
     filenames_set = set(filenames)
@@ -77,6 +81,24 @@ def _get_max_feature_index(column_names):
             values.append(int(m.group(1)))
     return max(values)
 
+_cached_client = None
+
+def _download_to_localfile(path):
+    if path.startswith("gs://"):
+        global _cached_client
+        if _cached_client is None:
+            _cached_client = storage.Client()
+        with tempfile.NamedTemporaryFile("wb", prefix="download", delete=False) as fd:
+            _cached_client.download_blob_to_file(path, fd)
+            return fd.name
+    else:
+        return path
+
+def resolve_to_localfiles(filenames):
+    with ProcessPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(_download_to_localfile, filename) for filename in filenames]
+        results = [future.result() for future in tqdm(futures)]
+    return results
 
 def read_row_concatenated_csvs(filenames : list[str]):
     """
@@ -84,9 +106,11 @@ def read_row_concatenated_csvs(filenames : list[str]):
     Each file will add more rows.
     """
 
-    print(f"Reading {len(filenames)} csv files to concat rows...")
+    print(f"Localizing {len(filenames)} csv files to concat rows...")
+    local_filenames = resolve_to_localfiles(filenames)
 
-    dfs = [pd.read_csv(filename) for filename in filenames]
+    print("Reading csv files...")
+    dfs = [pd.read_csv(filename) for filename in tqdm(local_filenames)]
     return pd.concat(dfs, ignore_index=True)
 
 def read_col_concatenated_csvs(filenames : list[str]):
@@ -95,7 +119,10 @@ def read_col_concatenated_csvs(filenames : list[str]):
     Each file will add more columns, and the index will be used to align the rows.
     """
 
-    print(f"Reading {len(filenames)} csv files to concat cols...")
+    print(f"Localizing {len(filenames)} csv files to concat cols...")
+    local_filenames = resolve_to_localfiles(filenames)
 
-    dfs = [pd.read_csv(filename, index_col=0) for filename in filenames]
+    print("Reading csv files...")
+
+    dfs = [pd.read_csv(filename, index_col=0) for filename in tqdm(local_filenames)]
     return pd.concat(dfs, axis=1)
