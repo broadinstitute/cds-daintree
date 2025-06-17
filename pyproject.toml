@@ -1,18 +1,19 @@
 [tool.poetry]
 name = "daintree"
-version = "0.1.0"
+version = "0.1.1"
 description = "Daintree Module"
 authors = ["Nayeem Aquib <naquib@broadinsitute.org>"]
 readme = "README.md"
-packages = [{include = "daintree"}]
+packages = [{include = "daintree_core"}, {include="daintree_runner"}]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">3.9,<3.10"
 pandas = "1.5.3"
 click = "^8.1.7"
 numpy = "^1.25.1"
 scikit-learn = "1.5.1"
 taigapy = {version = "3.8.3", source = "gcp-artifact-registry"}
+gcsfs = "^2025.5.0.post1"
 
 [[tool.poetry.source]]
 name = "gcp-artifact-registry"
@@ -22,10 +23,13 @@ priority = "explicit"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
+pyright = "^1.1.400"
+pytest = "^8.3.5"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-daintree-fit-models="daintree.daintree_fit_models:main"
+daintree-runner="daintree_runner.main:main"
+daintree-core="daintree_core.main:main"

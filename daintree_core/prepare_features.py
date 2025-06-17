@@ -45,7 +45,9 @@ def standardize_col_name(
         old: new
         for old, new in zip(
             df.columns,
-            df.add_suffix("_" + dataset_name).columns.str.replace(r"[\s-]", "_", regex=True),
+            df.add_suffix("_" + dataset_name).columns.str.replace(
+                r"[\s-]", "_", regex=True
+            ),
         )
     }
 

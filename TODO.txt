@@ -1,0 +1,51 @@
+- Add support for seeding
+   - rebuild docker image
+     - update dockerfile
+       - reorganize files into a python modules
+- Create wrapper for executing a chain of commands (where each command provides the _next_ command to run)
+
+- Figure out naming/how to communcate relationship between daintree-sparkles and daintree-core 
+   It sounds like that something like: 
+     daintree-sparkles (outer command)
+       which calls daintree-core
+
+
+###################################
+
+sh run-daintree model-map.json
+   to everything needed to fit the models described in model-map.json
+
+   steps:
+   1. fetching data from taiga and reformatting
+      docker run daintree prepare-data input.json
+      writes out a file that says: "next step: step 2"
+      (suspend)
+   2. Fit all the models (needs sparkles) and aggregate results into a single file per model
+      sparkles sub -i daintree ....
+      writes out a file that says: "next step: step 3"
+   3. Get output and upload to taiga
+   4. Generate a single output config json file with information about all the outputs
+
+Design goals:
+1. never run docker within docker (this is hard!)
+2. should be able to run from jenkins 
+
+
+imagine run_daintree.sh contains:
+1. run command
+2. get the output from step #1 which contains a new command
+3. if new command == "stop" then exit
+4. go to step 1
+
+
+execute command with environment DAINTREE_NEXT_JSON set
+
+thunk = {type: "done"} | 
+    {type:"command", command: list[str]} | 
+    {"type": "sparkles", command: list[str], parameters: str, files_to_upload: list[str], post_command}
+
+
+
+##################
+
+execution starts at collect_and_fit()

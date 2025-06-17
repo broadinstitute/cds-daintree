@@ -15,6 +15,9 @@ from .parsing_utilities import (
     read_model_config,
     read_feature_info,
 )
+import random
+from time import time
+import resource
 
 @click.group()
 def main():
@@ -36,6 +39,15 @@ def prepare_y(
     top_variance_filter: Optional[int],
     gene_filter: Optional[str],
 ):
+    return prepare_y_command(input, output, top_variance_filter, gene_filter)
+
+
+def prepare_y_command(
+    input: str,
+    output: str,
+    top_variance_filter: Optional[int],
+    gene_filter: Optional[str],
+):
     if top_variance_filter is not None and top_variance_filter < 1:
         raise click.ClickException("Top variance filter must be >= 1")
 
@@ -43,7 +55,6 @@ def prepare_y(
         df = read_dataframe(input)
     except FileNotFoundError:
         raise click.ClickException(f"File {input} not found")
-
     except pd.ParserError:
         raise click.ClickException(f"Could not read {input} as CSV")
 
@@ -108,6 +119,31 @@ def prepare_x(
     output_format: Optional[str],
     output_related: Optional[str],
 ):
+    return prepare_x_command(
+        model_config,
+        targets,
+        feature_info,
+        output,
+        confounders,
+        output_format,
+        output_related,
+    )
+
+
+def prepare_x_command(
+    model_config: str,
+    targets: str,
+    feature_info: str,
+    output: str,
+    confounders: Optional[str],
+    output_format: Optional[str],
+    output_related: Optional[str],
+):
+    "This prepare_x_command() function exists so we can call prepare_x directly, bypassing click"
+
+    if output_format is None:
+        output_format = ".ftr"
+
     for p in [model_config, targets, feature_info]:
         if not os.path.exists(p):
             raise click.ClickException(f"File {p} not found")
@@ -144,6 +180,7 @@ def prepare_x(
         feature_metadata.to_csv(f"{file_prefix}_feature_metadata.csv", index=False)
         model_valid_samples.to_csv(f"{file_prefix}_valid_samples.csv")
     else:
+        assert output_format == ".ftr", f"expected output_format=.ftr but was {output_format}, output={output}"
         combined_features.reset_index().to_feather(f"{file_prefix}.ftr")
         feature_metadata.reset_index(drop=True).to_feather(
             f"{file_prefix}_feature_metadata.ftr"
@@ -208,13 +245,20 @@ def prepare_x(
     "--targets", type=str, help="if specified, fit models for targets with these labels"
 )
 @click.option("--output-dir", type=str)
+@click.option(
+    "--top-n",
+    help="Number of features to write to resulting file (defaults to 50)",
+    type=int,
+    default=50,
+)
+@click.option("--seed", help="random seed (defaults to 0)", type=int, default=0)
 def fit_model(
     x: str,
     y: str,
     model_config: str,
     model: str,
     task_mode: str,
-    n_folds: Optional[int],
+    n_folds: int,
     related_table: Optional[str],
     feature_metadata: Optional[str],
     model_valid_samples: Optional[str],
@@ -223,7 +267,49 @@ def fit_model(
     target_range: Optional[Tuple[int, int]],
     targets: Optional[str],
     output_dir: Optional[str],
+    top_n: int,
+    seed: int,
 ):
+    return fit_model_command(
+        x,
+        y,
+        model_config,
+        model,
+        task_mode,
+        n_folds,
+        related_table,
+        feature_metadata,
+        model_valid_samples,
+        valid_samples_file,
+        feature_subset_file,
+        target_range,
+        targets,
+        output_dir,
+        top_n,
+        seed,
+    )
+
+
+def fit_model_command(
+    x: str,
+    y: str,
+    model_config: str,
+    model: str,
+    task_mode: str,
+    n_folds: int,
+    related_table: Optional[str],
+    feature_metadata: Optional[str],
+    model_valid_samples: Optional[str],
+    valid_samples_file: Optional[str],
+    feature_subset_file: Optional[str],
+    target_range: Optional[Tuple[int, int]],
+    targets: Optional[str],
+    output_dir: Optional[str],
+    top_n: int,
+    seed: int,
+):
+    start_time = time()
+    random.seed(seed)
     selected_model_config = read_model_config(model_config)[model]
     if selected_model_config.relation == "MatchRelated" and related_table is None:
         raise click.ClickException(
@@ -298,6 +384,7 @@ def fit_model(
         raise click.ClickException(str(e))
 
     # start_col, end_col not passed in because X, Y already filtered
+    fit_start = time()
     ensemble = run_model(
         X=X,
         Y=Y,
@@ -308,6 +395,7 @@ def fit_model(
         feature_metadata=feature_metadata_df,
     )
 
+    write_start = time()
     feature_file_path = (
         f"{selected_model_config.name}_{start_col}_{end_col}_features.csv"
     )
@@ -319,7 +407,21 @@ def fit_model(
         feature_file_path = os.path.join(output_dir, feature_file_path)
         predictions_file_path = os.path.join(output_dir, predictions_file_path)
 
-    ensemble.save_results(feature_file_path, predictions_file_path)
+    print(f"Writing {feature_file_path} and {predictions_file_path}...")
+    ensemble.save_results(feature_file_path, predictions_file_path, top_n, X, Y)
+
+    task_end = time()
+    max_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    # recording the elapsed timings 
+    timings_df = pd.DataFrame([{"model": model, 
+                               "start_col": start_col,
+                               "end_col": end_col,
+                               "startup_secs": fit_start-start_time, 
+                               "fit_secs": write_start-fit_start, 
+                               "write_secs": task_end-write_start, 
+                               "target_count": Y.shape[1],
+                               "max_rss":max_rss}])
+    timings_df.to_csv(f"timings.csv",index=False)
 
 
 if __name__ == "__main__":
