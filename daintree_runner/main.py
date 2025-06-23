@@ -191,31 +191,34 @@ def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds
         "steps": [
             {
                 "command": prepare_command,
-                "files_to_localize": [f"model_config.json"],
+                "paths_to_localize": [{"src": config, "dst":"model_config.json"}],
             },
             {
-                # f"{DAINTREE_CORE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config {core_config_path} --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
-                "command": [DAINTREE_CORE_BIN_PATH, "fit-model", "--x", "out/X.ftr", "--y", "out/target_matrix.ftr", "--model-config", "{parameter.model_config}", "--n-folds", str(nfolds), "--target-range", "{parameter.start_index}", "{parameter.end_index}", "--model", "{parameter.model_name}"],
+                "command": ["daintree-core", "fit-model", "--x", "out/X.ftr", "--y", "out/target_matrix.ftr", "--model-config", "{parameter.model_config}", "--n-folds", str(nfolds), "--target-range", "{parameter.start_index}", "{parameter.end_index}", "--model", "{parameter.model_name}"],
                 "parameters_csv": "{step.1.job_path}/1/out/partitions.csv",
                   "paths_to_localize": [
                     {"src": "{step.1.job_path}/1/out", "dst":"out"}
                 ]
             },
-            {"command": ["daintree-runner", "gather", "--dir", "{step.2.job_path}"]},
+            {"command": ["daintree-runner", "gather", "--dir", "{step.2.job_path}", "{step.1.job_path}/1/out/partitions.csv"]},
         ],
         "write_on_completion": [
             {
-                "expression": {"ensemble_path":
+                "expression": {
+                    "sparkles_job_name": "{step.1.job_name}",
+                    "features_metadata_path": "{step.1.job_path}/1/out/feature_metadata.csv",
+                    "ensemble_path":
                                 "{step.3.job_path}/1/ensemble.csv",
-                               "predictions_path": 
+                    "predictions_path": 
                                 "{step.3.job_path}/1/predictions.csv"},
-                "filename": "outputs.json"
+                "filename": "daintree-output.json"
             },
         ],
     }
     workflow_json = json.dumps(workflow, indent=2)
 
     if out:
+        print(f"writing workflow to {out}")
         with open(out, "wt") as fd:
             fd.write(workflow_json)
     else:
