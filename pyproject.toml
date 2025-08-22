@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "daintree_core"}, {include="daintree_runner"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.9, <4.0"
 pandas = "^1.5.3"
 click = "^8.1.7"
 numpy = "^1.25.1"
