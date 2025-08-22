@@ -7,12 +7,12 @@ readme = "README.md"
 packages = [{include = "daintree_core"}, {include="daintree_runner"}]
 
 [tool.poetry.dependencies]
-python = ">3.9,<3.10"
-pandas = "1.5.3"
+python = "^3.9"
+pandas = "^1.5.3"
 click = "^8.1.7"
 numpy = "^1.25.1"
-scikit-learn = "1.5.1"
-taigapy = {version = "3.8.3", source = "gcp-artifact-registry"}
+scikit-learn = "^1.5.1"
+taigapy = {version = "^3.8.3", source = "gcp-artifact-registry"}
 gcsfs = "^2025.5.0.post1"
 
 [[tool.poetry.source]]
