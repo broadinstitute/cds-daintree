@@ -8,7 +8,7 @@ packages = [{include = "daintree_core"}, {include="daintree_runner"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9, <4.0"
-pandas = "^1.5.3"
+pandas = "^2.3.2"
 click = "^8.1.7"
 numpy = "^1.25.1"
 scikit-learn = "^1.5.1"
