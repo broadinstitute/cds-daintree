@@ -422,6 +422,7 @@ def fit_model_command(
                                "target_count": Y.shape[1],
                                "max_rss":max_rss}])
     timings_df.to_csv(f"timings.csv",index=False)
+    return ensemble
 
 
 if __name__ == "__main__":
