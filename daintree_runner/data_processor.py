@@ -109,7 +109,11 @@ def _process_dep_matrix(df: pd.DataFrame, test_first_n_models:Optional[int], res
         print("\033[93mWarning: Truncating datasets for testing...\033[0m")  # Yellow
         # If no specific targets, apply column filtering
         if restrict_targets_to:
-            pattern = "|".join(re.escape(col) for col in restrict_targets_to)
+            pattern = (
+                r"\b("
+                + "|".join(re.escape(col) for col in restrict_targets_to)
+                + r")\b"
+            )
             mask = df.columns.str.contains(pattern, regex=True)
             df = df.loc[:, mask]
         else:
