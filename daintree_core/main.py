@@ -421,7 +421,7 @@ def fit_model_command(
                                "write_secs": task_end-write_start, 
                                "target_count": Y.shape[1],
                                "max_rss":max_rss}])
-    timings_df.to_csv(f"timings.csv",index=False)
+    timings_df.to_csv(output_dir/f"timings.csv",index=False)
     return ensemble
 
 
