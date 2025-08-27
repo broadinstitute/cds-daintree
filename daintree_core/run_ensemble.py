@@ -143,7 +143,7 @@ def single_fit(
     scoring,
     nfeatures=50,
     rounding=False,
-    return_models=False,
+    return_models=True,
 ):
     y = Y[column]
     if rounding:
