@@ -1,6 +1,6 @@
 [config]
-default_url_prefix=gs://broad-achilles-kubeque/depmap-pipeline
-project=broad-achilles
+default_url_prefix=gs://dpp-sparkles
+project=depmap-portal-pipeline
 default_image=ubuntu
 region=us-central1
 machine_type=n2-highmem-2
