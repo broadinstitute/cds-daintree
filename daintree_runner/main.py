@@ -5,7 +5,7 @@ from .prepare import prepare
 from taigapy import create_taiga_client_v3
 import os
 import sys
-
+from glob import glob
 
 # CLI Setup
 @click.group()
@@ -176,37 +176,72 @@ from .config import DAINTREE_CORE_BIN_PATH
     help="If set, will only run a max of N tasks (for testing)"    
 )
 @click.option("--test", is_flag=True, help="Run a test run (subsetting the data to make a fast, but incomplete, run)")
-def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds: int, models_per_task: int, test_first_n_tasks:Optional[int]):
-    prepare_command = [
-                    "daintree-runner",
-                    "prepare-and-partition",
-                    "--input-config",
-                    "model_config.json",
-                    "--out",
-                    "out",
-                    "--models-per-task",
-                    str(models_per_task)
-                ] + (["--test-first-n-tasks", str(test_first_n_tasks)] if test_first_n_tasks else [])
+@click.option(
+    "--python-path",
+    multiple=True,
+    help="Directory which contains python files which should be in python search path so they can contain functions used for preprocessing data. All *.py files in this directory will be transferred to worker nodes into a single directory.",
+)
+def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds: int, models_per_task: int, test_first_n_tasks:Optional[int], python_path: tuple):
+    # Build prepare command with optional python-path arguments
+    
+    # I worry about the random names that 
+    transfered_python_files_dir = "extra_python_files"
+    python_files_to_transfer = []
+    for python_path_ in python_path: 
+        python_files_to_transfer.extend(glob(f"{python_path_}/*.py"))
+
+    python_path_parameter = []    
+    if len(python_files_to_transfer) > 0:
+        print(f"Found the following files {python_files_to_transfer} which will be transferred to {repr(transfered_python_files_dir)} on node", file=sys.stderr)
+        python_path_parameter.extend(["--python-path", transfered_python_files_dir])
+
+    prepare_command = ["daintree-runner"] + python_path_parameter
+        
+    prepare_command.extend([
+        "prepare-and-partition",
+        "--input-config",
+        "model_config.json",
+        "--out",
+        "out",
+        "--models-per-task",
+        str(models_per_task)
+    ])
+    if test_first_n_tasks:
+        prepare_command.extend(["--test-first-n-tasks", str(test_first_n_tasks)])
     if test:
         prepare_command.append("--test")
 
+    # Build fit-model command with optional python-path arguments
+    fit_model_command = [DAINTREE_CORE_BIN_PATH] + python_path_parameter
+    fit_model_command.extend([
+        "fit-model",
+        "--x", "out/X.ftr",
+        "--y", "out/target_matrix.ftr",
+        "--model-config", "{parameter.model_config}",
+        "--n-folds", str(nfolds),
+        "--target-range", "{parameter.start_index}", "{parameter.end_index}",
+        "--model", "{parameter.model_name}"
+    ])
+
     taiga_token = _find_taiga_token()
 
+    # Build paths_to_localize including python-path directories
+    paths_to_localize = [{"src": taiga_token, "dst": ".taiga-token"}]
+    for python_files_to_transfer in python_files_to_transfer:
+        paths_to_localize.append({"src": python_files_to_transfer, "dst": f"{transfered_python_files_dir}/{os.path.basename(python_files_to_transfer)}"})
+
     workflow = {
-        "paths_to_localize": [
-        {"src": taiga_token, "dst":".taiga-token"}
-        ],
+        "paths_to_localize": paths_to_localize,
         "steps": [
             {
                 "command": prepare_command,
-                "files_to_localize": [f"model_config.json"],
+                "files_to_localize": ["model_config.json"],
             },
             {
-                # f"{DAINTREE_CORE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config {core_config_path} --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
-                "command": [DAINTREE_CORE_BIN_PATH, "fit-model", "--x", "out/X.ftr", "--y", "out/target_matrix.ftr", "--model-config", "{parameter.model_config}", "--n-folds", str(nfolds), "--target-range", "{parameter.start_index}", "{parameter.end_index}", "--model", "{parameter.model_name}"],
+                "command": fit_model_command,
                 "parameters_csv": "{step.1.job_path}/1/out/partitions.csv",
-                  "paths_to_localize": [
-                    {"src": "{step.1.job_path}/1/out", "dst":"out"}
+                "paths_to_localize": [
+                    {"src": "{step.1.job_path}/1/out", "dst": "out"}
                 ]
             },
             {"command": ["daintree-runner", "gather", "--dir", "{step.2.job_path}"]},
