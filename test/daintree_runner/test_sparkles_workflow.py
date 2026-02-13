@@ -23,7 +23,7 @@ def test_create_sparkles_workflow_with_python_path(tmpdir):
         result = runner.invoke(cli, [
             "create-sparkles-workflow",
             "--config", "model-map.json",
-            "--python-path", str(python_dir),
+            "--python-to-upload", str(python_dir),
         ])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"

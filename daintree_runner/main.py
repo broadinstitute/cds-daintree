@@ -177,17 +177,17 @@ from .config import DAINTREE_CORE_BIN_PATH
 )
 @click.option("--test", is_flag=True, help="Run a test run (subsetting the data to make a fast, but incomplete, run)")
 @click.option(
-    "--python-path",
+    "--python-to-upload",
     multiple=True,
     help="Directory which contains python files which should be in python search path so they can contain functions used for preprocessing data. All *.py files in this directory will be transferred to worker nodes into a single directory.",
 )
-def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds: int, models_per_task: int, test_first_n_tasks:Optional[int], python_path: tuple):
+def create_sparkles_workflow(config: str, out: Optional[str], test: bool, nfolds: int, models_per_task: int, test_first_n_tasks:Optional[int], python_to_upload: tuple):
     # Build prepare command with optional python-path arguments
-    
-    # I worry about the random names that 
+
+    # I worry about the random names that
     transfered_python_files_dir = "extra_python_files"
     python_files_to_transfer = []
-    for python_path_ in python_path: 
+    for python_path_ in python_to_upload:
         python_files_to_transfer.extend(glob(f"{python_path_}/*.py"))
 
     python_path_parameter = []    
