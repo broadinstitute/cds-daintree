@@ -4,12 +4,20 @@ from pathlib import Path
 from .prepare import prepare
 from taigapy import create_taiga_client_v3
 import os
+import sys
 
 
 # CLI Setup
 @click.group()
-def cli():
-    pass
+@click.option(
+    "--python-path",
+    multiple=True,
+    help="Add directory to sys.path for importing custom preprocessing functions",
+)
+def cli(python_path):
+    for path in python_path:
+        if path not in sys.path:
+            sys.path.insert(0, path)
 
 
 @cli.command()

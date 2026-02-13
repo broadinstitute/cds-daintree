@@ -1,5 +1,6 @@
 import os
 import pathlib
+import sys
 
 from typing import List, Optional, Tuple
 
@@ -20,8 +21,15 @@ from time import time
 import resource
 
 @click.group()
-def main():
-    pass
+@click.option(
+    "--python-path",
+    multiple=True,
+    help="Add directory to sys.path for importing custom preprocessing functions",
+)
+def main(python_path):
+    for path in python_path:
+        if path not in sys.path:
+            sys.path.insert(0, path)
 
 
 @main.command()

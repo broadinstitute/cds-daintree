@@ -54,6 +54,7 @@ docker run --rm \
 * `--skipfit`: A boolean flag that takes either `True` or `False`. Specify if you want to skip the actual model fitting process. (Defaults to `True`)
 * `--restrict-targets-to`: A comma separated list of target columns to filter. If not provided and `--test` is `True`, uses TEST_LIMIT from `config.py`.
 * `--upload-to-taiga`: The taiga id where the output ensemble, feature metadata, and predictions to be uploaded. (Defaults to `None`)
+* `--python-path`: Add a directory to `sys.path` for importing custom preprocessing functions. Can be specified multiple times to add multiple directories.
 
 ### Model Config File
 The primary input you need to provide here is the MODEL_CONFIG which is a JSON file listing the datasets to pull from. It follows the following format:
