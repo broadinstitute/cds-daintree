@@ -112,7 +112,11 @@ def process_biomarker_matrix(df: pd.DataFrame, index_col: int = 0):
     return df
 
 
-def _process_dep_matrix(df: pd.DataFrame, test_first_n_models:Optional[int], restrict_targets_to: Optional[List[str]]):
+def _process_dep_matrix(
+    df: pd.DataFrame,
+    test_first_n_models: Optional[int],
+    restrict_targets_to: Optional[List[str]],
+):
     """Process dependency matrix data.
     Args:
         df: Dependency matrix dataframe
@@ -124,7 +128,7 @@ def _process_dep_matrix(df: pd.DataFrame, test_first_n_models:Optional[int], res
     print("Start Processing Dependency Matrix")
     df = df.dropna(how="all", axis=0)
     df = df.dropna(how="all", axis=1)
- 
+
     if test_first_n_models is not None:
         print("\033[93mWarning: Truncating datasets for testing...\033[0m")  # Yellow
         # If no specific targets, apply column filtering
@@ -138,7 +142,7 @@ def _process_dep_matrix(df: pd.DataFrame, test_first_n_models:Optional[int], res
             df = df.loc[:, mask]
         else:
             # If no filter columns provided, take first test_first_n_models columns
-            df = df.iloc[:, : test_first_n_models]
+            df = df.iloc[:, :test_first_n_models]
     else:
         print(
             "\033[93mWarning: Not truncating datasets. This may take a while...\033[0m"
@@ -150,7 +154,12 @@ def _process_dep_matrix(df: pd.DataFrame, test_first_n_models:Optional[int], res
 
 
 def process_dependency_data(
-    tc, save_pref, runner_config, *, test_first_n_models:Optional[int], restrict_targets_to:Optional[List[str]]
+    tc,
+    save_pref,
+    runner_config,
+    *,
+    test_first_n_models: Optional[int],
+    restrict_targets_to: Optional[List[str]],
 ):
     """Process dependency matrix data from Taiga and prepare it for model training.
 
@@ -192,8 +201,9 @@ def process_dependency_data(
 
     return df_dep
 
+
 def write_feather_df_with_index(df, filename):
-    df = df.copy() 
+    df = df.copy()
     df.index.name = "Row.name"
     df = df.reset_index()
     df.to_feather(filename)

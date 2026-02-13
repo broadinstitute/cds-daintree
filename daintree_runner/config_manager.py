@@ -61,6 +61,7 @@ def load_runner_config(input_config):
 
     return config
 
+
 def generate_core_config(save_pref: Path, runner_config: dict):
     """Setup and validate ensemble configuration.
 
@@ -184,4 +185,3 @@ def determine_relations(config_dict):
         related_dset = list(set(relations).difference(set(["All", "MatchTarget"])))[0]
 
     return out_rel, related_dset
-

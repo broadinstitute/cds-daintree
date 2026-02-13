@@ -1,5 +1,9 @@
 import pandas as pd
-from daintree_runner.gather import read_row_concatenated_csvs, read_col_concatenated_csvs
+from daintree_runner.gather import (
+    read_row_concatenated_csvs,
+    read_col_concatenated_csvs,
+)
+
 
 def test_read_row_concatenated_csvs(tmpdir):
     index = 0
@@ -19,6 +23,7 @@ def test_read_row_concatenated_csvs(tmpdir):
     assert list(df["a"]) == [1, 2, 5, 6]
     assert list(df["b"]) == [3, 4, 7, 8]
 
+
 def read_col_concatenated_csvs(tmpdir):
     index = 0
 
@@ -34,5 +39,5 @@ def read_col_concatenated_csvs(tmpdir):
 
     df = read_row_concatenated_csvs([fn1, fn2])
 
-    assert list(df.loc["i0",["a", "b", "c", "d"]]) == [1,3,2,4]
-    assert list(df.loc["i1",["a", "b", "c", "d"]]) == [2,4,1,3]
+    assert list(df.loc["i0", ["a", "b", "c", "d"]]) == [1, 3, 2, 4]
+    assert list(df.loc["i1", ["a", "b", "c", "d"]]) == [2, 4, 1, 3]

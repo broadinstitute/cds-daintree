@@ -20,11 +20,16 @@ def test_create_sparkles_workflow_with_python_path(tmpdir):
 
     try:
         runner = CliRunner(mix_stderr=False)
-        result = runner.invoke(cli, [
-            "create-sparkles-workflow",
-            "--config", "model-map.json",
-            "--python-to-upload", str(python_dir),
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "create-sparkles-workflow",
+                "--config",
+                "model-map.json",
+                "--python-to-upload",
+                str(python_dir),
+            ],
+        )
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
 
@@ -33,7 +38,8 @@ def test_create_sparkles_workflow_with_python_path(tmpdir):
         # Check that python files are in paths_to_localize
         paths_to_localize = workflow["paths_to_localize"]
         python_file_destinations = [
-            p["dst"] for p in paths_to_localize
+            p["dst"]
+            for p in paths_to_localize
             if p["dst"].startswith("extra_python_files/")
         ]
         assert "extra_python_files/preprocess.py" in python_file_destinations
@@ -65,10 +71,9 @@ def test_create_sparkles_workflow_without_python_path(tmpdir):
 
     try:
         runner = CliRunner()
-        result = runner.invoke(cli, [
-            "create-sparkles-workflow",
-            "--config", "model-map.json"
-        ])
+        result = runner.invoke(
+            cli, ["create-sparkles-workflow", "--config", "model-map.json"]
+        )
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
 
@@ -77,8 +82,7 @@ def test_create_sparkles_workflow_without_python_path(tmpdir):
         # Check that no extra_python_files paths are in paths_to_localize
         paths_to_localize = workflow["paths_to_localize"]
         python_file_destinations = [
-            p["dst"] for p in paths_to_localize
-            if "extra_python_files" in p["dst"]
+            p["dst"] for p in paths_to_localize if "extra_python_files" in p["dst"]
         ]
         assert len(python_file_destinations) == 0
 

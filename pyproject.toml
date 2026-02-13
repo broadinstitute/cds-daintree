@@ -26,6 +26,7 @@ priority = "explicit"
 ipykernel = "^6.29.5"
 pyright = "^1.1.400"
 pytest = "^8.3.5"
+pre-commit = "<4"
 
 [build-system]
 requires = ["poetry-core"]

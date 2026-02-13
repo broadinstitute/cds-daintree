@@ -9,12 +9,16 @@ from tqdm import tqdm
 import tempfile
 from concurrent.futures import ProcessPoolExecutor
 
+
 def match_files_by_names(full_paths: list[str], filenames: list[str]):
     filenames_set = set(filenames)
     matches = [x for x in full_paths if os.path.basename(x) in filenames_set]
     missing = filenames_set.difference([os.path.basename(x) for x in matches])
-    assert len(matches) == len(filenames_set) and len(missing) == 0, f"Could not find the expected filenames: matches={matches}, filenames_set={filenames_set}, missing={missing}, full_paths={full_paths}"
+    assert (
+        len(matches) == len(filenames_set) and len(missing) == 0
+    ), f"Could not find the expected filenames: matches={matches}, filenames_set={filenames_set}, missing={missing}, full_paths={full_paths}"
     return matches
+
 
 def find_files(wildcard: str):
     fs, path = fsspec.url_to_fs(wildcard)
@@ -23,19 +27,19 @@ def find_files(wildcard: str):
         prefix = "gs://"
     else:
         prefix = ""
-    return [prefix+x for x in fs.glob(path)]
+    return [prefix + x for x in fs.glob(path)]
 
 
-def gather(
-    src_dir: str,
-    dst_prefix: str,
-    partitions_csv: str
-):
+def gather(src_dir: str, dst_prefix: str, partitions_csv: str):
     partitions = pd.read_csv(partitions_csv)
 
     csv_paths = find_files(f"{src_dir}/**/*.csv")
-    ensemble_filenames = match_files_by_names(csv_paths, list(partitions["ensemble_filename"]))
-    predictions_filenames = match_files_by_names(csv_paths, list(partitions["predictions_filename"]))
+    ensemble_filenames = match_files_by_names(
+        csv_paths, list(partitions["ensemble_filename"])
+    )
+    predictions_filenames = match_files_by_names(
+        csv_paths, list(partitions["predictions_filename"])
+    )
 
     df_ensemble = read_row_concatenated_csvs(ensemble_filenames)
     df_predictions = read_col_concatenated_csvs(predictions_filenames)
@@ -68,10 +72,13 @@ def gather(
     predictions_filename = dst_prefix + "predictions.csv"
     timings_filename = dst_prefix + "timings.csv"
 
-    print(f"Writing merged {ensemble_filename} and {predictions_filename} and {timings_filename}")
+    print(
+        f"Writing merged {ensemble_filename} and {predictions_filename} and {timings_filename}"
+    )
     df_ensemble.to_csv(ensemble_filename, index=False)
     df_predictions.to_csv(predictions_filename, index=True)
     df_timings.to_csv(timings_filename, index=False)
+
 
 def _get_max_feature_index(column_names):
     values = []
@@ -81,7 +88,9 @@ def _get_max_feature_index(column_names):
             values.append(int(m.group(1)))
     return max(values)
 
+
 _cached_client = None
+
 
 def _download_to_localfile(path):
     path = str(path)
@@ -95,15 +104,19 @@ def _download_to_localfile(path):
     else:
         return path
 
+
 def resolve_to_localfiles(filenames):
     with ProcessPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(_download_to_localfile, filename) for filename in filenames]
+        futures = [
+            executor.submit(_download_to_localfile, filename) for filename in filenames
+        ]
         results = [future.result() for future in tqdm(futures)]
     return results
 
-def read_row_concatenated_csvs(filenames : list[str]):
+
+def read_row_concatenated_csvs(filenames: list[str]):
     """
-    Read all csvs and return them as a concatenated pd.DataFrame 
+    Read all csvs and return them as a concatenated pd.DataFrame
     Each file will add more rows.
     """
 
@@ -114,7 +127,8 @@ def read_row_concatenated_csvs(filenames : list[str]):
     dfs = [pd.read_csv(filename) for filename in tqdm(local_filenames)]
     return pd.concat(dfs, ignore_index=True)
 
-def read_col_concatenated_csvs(filenames : list[str]):
+
+def read_col_concatenated_csvs(filenames: list[str]):
     """
     Read all csvs and return them as a concatenated pd.DataFrame
     Each file will add more columns, and the index will be used to align the rows.

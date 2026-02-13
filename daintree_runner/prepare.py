@@ -81,7 +81,12 @@ def process_dataset_for_feature_metadata(
 
 
 def generate_feature_metadata(
-    tc, runner_config, feature_path_info, related_dset, *, test_first_n_models : Optional[int]=None 
+    tc,
+    runner_config,
+    feature_path_info,
+    related_dset,
+    *,
+    test_first_n_models: Optional[int] = None,
 ):
     """Process feature information for all datasets and generate feature metadata.
     Args:
@@ -110,7 +115,9 @@ def generate_feature_metadata(
             continue
 
         dataset_metadata_df = tc.get(dataset_metadata["taiga_id"])
-        dataset_metadata_df = apply_preprocess(dataset_metadata_df, dataset_metadata.get("preprocess"))
+        dataset_metadata_df = apply_preprocess(
+            dataset_metadata_df, dataset_metadata.get("preprocess")
+        )
         _df, dataset_info = process_dataset_for_feature_metadata(
             dataset_metadata_df,
             dataset_name,
@@ -159,7 +166,7 @@ def prepare(
     save_pref: Path,
     nfolds: int,
     models_per_task: int,
-    test_first_n_tasks : Optional[int],
+    test_first_n_tasks: Optional[int],
 ):
     runner_config = config_manager.load_runner_config(runner_config_path)
 
@@ -176,12 +183,20 @@ def prepare(
     out_rel, related_dset = config_manager.determine_relations(core_config_dict)
 
     feature_metadata_df = generate_feature_metadata(
-        tc, runner_config, feature_path_info, related_dset, test_first_n_models=test_first_n_models
+        tc,
+        runner_config,
+        feature_path_info,
+        related_dset,
+        test_first_n_models=test_first_n_models,
     )
 
     # Process dependency data writing out (unfiltered) target ftr file
     df_dep = data_processor.process_dependency_data(
-        tc, save_pref, runner_config, test_first_n_models=test_first_n_models, restrict_targets_to=restrict_targets_to
+        tc,
+        save_pref,
+        runner_config,
+        test_first_n_models=test_first_n_models,
+        restrict_targets_to=restrict_targets_to,
     )
 
     # Save feature matrix file path information
@@ -192,7 +207,9 @@ def prepare(
     data_processor.prepare_data(save_pref, out_rel, core_config_path)
 
     print("Partitioning inputs...")
-    partitions = data_processor.partition_inputs(df_dep, core_config_dict, models_per_task)
+    partitions = data_processor.partition_inputs(
+        df_dep, core_config_dict, models_per_task
+    )
 
     if test_first_n_tasks is not None:
         print(f"Limiting run to the first {test_first_n_tasks} tasks")
@@ -211,12 +228,25 @@ def _write_parameter_csv(
 
     with open(output_file, "wt") as fd:
         w = csv.writer(fd)
-        w.writerow(["model_config", "start_index", "end_index", "model_name", "predictions_filename", "ensemble_filename"])
+        w.writerow(
+            [
+                "model_config",
+                "start_index",
+                "end_index",
+                "model_name",
+                "predictions_filename",
+                "ensemble_filename",
+            ]
+        )
         for partition in partitions:
             w.writerow(
                 [
                     # f"{DAINTREE_CORE_BIN_PATH} fit-model --x X.ftr --y target.ftr --model-config {core_config_path} --n-folds {nfolds} --target-range {partition.start_index} {partition.end_index} --model {partition.model_name}"
-                    core_config_path, partition.start_index, partition.end_index, partition.model_name,
-                    f"{partition.model_name}_{partition.start_index}_{partition.end_index}_predictions.csv", f"{partition.model_name}_{partition.start_index}_{partition.end_index}_features.csv"
+                    core_config_path,
+                    partition.start_index,
+                    partition.end_index,
+                    partition.model_name,
+                    f"{partition.model_name}_{partition.start_index}_{partition.end_index}_predictions.csv",
+                    f"{partition.model_name}_{partition.start_index}_{partition.end_index}_features.csv",
                 ]
             )

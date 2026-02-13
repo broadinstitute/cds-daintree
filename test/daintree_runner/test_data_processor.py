@@ -16,7 +16,8 @@ def test_apply_preprocess_with_function(tmpdir):
     # Create a module with a preprocessing function
     module_dir = tmpdir.mkdir("my_module")
     module_file = module_dir.join("transforms.py")
-    module_file.write("""
+    module_file.write(
+        """
 import pandas as pd
 
 def double_values(df):
@@ -26,7 +27,8 @@ def add_column(df):
     df = df.copy()
     df['new_col'] = 100
     return df
-""")
+"""
+    )
 
     # Add the module directory to sys.path
     sys.path.insert(0, str(module_dir))
@@ -58,7 +60,8 @@ def test_apply_preprocess_in_prepare_flow(tmpdir):
     # Create a module with a preprocessing function
     module_dir = tmpdir.mkdir("preprocess_module")
     module_file = module_dir.join("my_preprocess.py")
-    module_file.write("""
+    module_file.write(
+        """
 import pandas as pd
 
 def filter_targets(df):
@@ -68,7 +71,8 @@ def filter_targets(df):
 
 def scale_features(df):
     return df * 10
-""")
+"""
+    )
 
     # Add the module directory to sys.path
     sys.path.insert(0, str(module_dir))
@@ -79,7 +83,8 @@ def scale_features(df):
         input_config = tmpdir.join("input.json")
 
         # Config with preprocess specified for target matrix
-        input_config.write("""
+        input_config.write(
+            """
 {
   "model_name": "TestModel",
   "screen_name": "Test",
@@ -100,7 +105,8 @@ def scale_features(df):
       }
     }
   }
-""")
+"""
+        )
 
         n_samples = 10
         samples = [f"ACH-{i}" for i in range(n_samples)]
@@ -108,17 +114,23 @@ def scale_features(df):
         def mock_tc_get(taiga_id):
             if taiga_id == "test-targets":
                 # Return targets with some KEEP and some DROP columns
-                return pd.DataFrame({
-                    "KEEP_T1": list(range(n_samples)),
-                    "KEEP_T2": list(range(n_samples)),
-                    "DROP_T3": list(range(n_samples)),
-                }, index=samples)
+                return pd.DataFrame(
+                    {
+                        "KEEP_T1": list(range(n_samples)),
+                        "KEEP_T2": list(range(n_samples)),
+                        "DROP_T3": list(range(n_samples)),
+                    },
+                    index=samples,
+                )
             else:
                 assert taiga_id == "test-features"
-                return pd.DataFrame({
-                    "F1": [1.0] * n_samples,
-                    "F2": [2.0] * n_samples,
-                }, index=samples)
+                return pd.DataFrame(
+                    {
+                        "F1": [1.0] * n_samples,
+                        "F2": [2.0] * n_samples,
+                    },
+                    index=samples,
+                )
 
         tc = MagicMock()
         tc.get = mock_tc_get
@@ -131,7 +143,7 @@ def scale_features(df):
             save_pref=save_pref,
             nfolds=5,
             models_per_task=1,
-            test_first_n_tasks=None
+            test_first_n_tasks=None,
         )
 
         # Check that only KEEP columns are in the partitions

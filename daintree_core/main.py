@@ -20,6 +20,7 @@ import random
 from time import time
 import resource
 
+
 @click.group()
 @click.option(
     "--python-path",
@@ -188,7 +189,9 @@ def prepare_x_command(
         feature_metadata.to_csv(f"{file_prefix}_feature_metadata.csv", index=False)
         model_valid_samples.to_csv(f"{file_prefix}_valid_samples.csv")
     else:
-        assert output_format == ".ftr", f"expected output_format=.ftr but was {output_format}, output={output}"
+        assert (
+            output_format == ".ftr"
+        ), f"expected output_format=.ftr but was {output_format}, output={output}"
         combined_features.reset_index().to_feather(f"{file_prefix}.ftr")
         feature_metadata.reset_index(drop=True).to_feather(
             f"{file_prefix}_feature_metadata.ftr"
@@ -420,16 +423,22 @@ def fit_model_command(
 
     task_end = time()
     max_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    # recording the elapsed timings 
-    timings_df = pd.DataFrame([{"model": model, 
-                               "start_col": start_col,
-                               "end_col": end_col,
-                               "startup_secs": fit_start-start_time, 
-                               "fit_secs": write_start-fit_start, 
-                               "write_secs": task_end-write_start, 
-                               "target_count": Y.shape[1],
-                               "max_rss":max_rss}])
-    timings_df.to_csv(f"timings.csv",index=False)
+    # recording the elapsed timings
+    timings_df = pd.DataFrame(
+        [
+            {
+                "model": model,
+                "start_col": start_col,
+                "end_col": end_col,
+                "startup_secs": fit_start - start_time,
+                "fit_secs": write_start - fit_start,
+                "write_secs": task_end - write_start,
+                "target_count": Y.shape[1],
+                "max_rss": max_rss,
+            }
+        ]
+    )
+    timings_df.to_csv(f"timings.csv", index=False)
 
 
 if __name__ == "__main__":
