@@ -84,6 +84,7 @@ def _get_max_feature_index(column_names):
 _cached_client = None
 
 def _download_to_localfile(path):
+    path = str(path)
     if path.startswith("gs://"):
         global _cached_client
         if _cached_client is None:
