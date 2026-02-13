@@ -67,7 +67,8 @@ The primary input you need to provide here is the MODEL_CONFIG which is a JSON f
           "table_type": [TYPE OF DATASET(This is either feature or target_matrix)],
           "dim_type": [TYPE OF DIMENSION IN BREADBOX(Usually "gene")],
           "required": [BOOLEAN(true or false)],
-          "exempt": [BOOLEAN(true or false)]
+          "exempt": [BOOLEAN(true or false)],
+          "preprocess": [OPTIONAL: "module.path:function_name" to transform the dataset after fetching]
       }
   }
 }
@@ -100,7 +101,7 @@ The primary input you need to provide here is the MODEL_CONFIG which is a JSON f
     }
   }
 ```
-Here `Exempt` is only used for match related. `Required` means that samples that have nans for those features are dropped. This is important because, for example, we want to automatically discard samples that we dont have confounder data for.
+Here `Exempt` is only used for match related. `Required` means that samples that have nans for those features are dropped. This is important because, for example, we want to automatically discard samples that we dont have confounder data for. `preprocess` is an optional field that specifies a function to transform the dataset after fetching from Taiga but before processing. The format is `"module.path:function_name"` where the function takes a DataFrame and returns a DataFrame.
 
 This file needs to have at least one feature matrix(specified as `type=feature`) and one target matrix(`type=target_matrix`) with taiga ids.
 

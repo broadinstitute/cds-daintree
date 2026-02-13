@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional, List
 from . import config_manager
 from . import data_processor
-from .data_processor import Partition
+from .data_processor import Partition, apply_preprocess
 from .config import DAINTREE_CORE_BIN_PATH
 
 
@@ -110,6 +110,7 @@ def generate_feature_metadata(
             continue
 
         dataset_metadata_df = tc.get(dataset_metadata["taiga_id"])
+        dataset_metadata_df = apply_preprocess(dataset_metadata_df, dataset_metadata.get("preprocess"))
         _df, dataset_info = process_dataset_for_feature_metadata(
             dataset_metadata_df,
             dataset_name,

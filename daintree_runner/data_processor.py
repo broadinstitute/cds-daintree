@@ -8,6 +8,27 @@ import numpy as np
 from .config import DAINTREE_CORE_BIN_PATH
 from glob import glob
 from dataclasses import dataclass
+import importlib
+from typing import Optional, List
+
+
+def apply_preprocess(df: pd.DataFrame, preprocess_spec: Optional[str]) -> pd.DataFrame:
+    """Apply a preprocessing function to a dataframe.
+
+    Args:
+        df: DataFrame to preprocess
+        preprocess_spec: String of form "module.path:function_name" or None
+
+    Returns:
+        Preprocessed DataFrame
+    """
+    if preprocess_spec is None:
+        return df
+
+    module_path, func_name = preprocess_spec.split(":")
+    module = importlib.import_module(module_path)
+    func = getattr(module, func_name)
+    return func(df)
 
 
 @dataclass
@@ -90,7 +111,6 @@ def process_biomarker_matrix(df: pd.DataFrame, index_col: int = 0):
 
     return df
 
-from typing import Optional, List
 
 def _process_dep_matrix(df: pd.DataFrame, test_first_n_models:Optional[int], restrict_targets_to: Optional[List[str]]):
     """Process dependency matrix data.
@@ -128,7 +148,6 @@ def _process_dep_matrix(df: pd.DataFrame, test_first_n_models:Optional[int], res
 
     return df
 
-from typing import Optional
 
 def process_dependency_data(
     tc, save_pref, runner_config, *, test_first_n_models:Optional[int], restrict_targets_to:Optional[List[str]]
@@ -145,18 +164,21 @@ def process_dependency_data(
     """
     print("Processing dependency data...")
 
-    # Find the Taiga ID for the target matrix by looking through input dictionary
+    # Find the target matrix config by looking through input dictionary
     # for the first entry with table_type="target_matrix"
-    dep_matrix_taiga_id = next(
+    target_matrix_config = next(
         (
-            v.get("taiga_id")
+            v
             for v in runner_config["data"].values()
             if v.get("table_type") == "target_matrix"
         ),
         None,
     )
 
-    df_dep = tc.get(dep_matrix_taiga_id)
+    df_dep = tc.get(target_matrix_config["taiga_id"])
+
+    # Apply preprocessing if specified
+    df_dep = apply_preprocess(df_dep, target_matrix_config.get("preprocess"))
 
     df_dep = _process_dep_matrix(df_dep, test_first_n_models, restrict_targets_to)
 
