@@ -1,3 +1,4 @@
+import logging
 import os
 import pathlib
 import sys
@@ -20,6 +21,8 @@ import random
 from time import time
 import resource
 
+log = logging.getLogger(__name__)
+
 
 @click.group()
 @click.option(
@@ -28,6 +31,11 @@ import resource
     help="Add directory to sys.path for importing custom preprocessing functions",
 )
 def main(python_path):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     for path in python_path:
         if path not in sys.path:
             sys.path.insert(0, path)
@@ -418,7 +426,7 @@ def fit_model_command(
         feature_file_path = os.path.join(output_dir, feature_file_path)
         predictions_file_path = os.path.join(output_dir, predictions_file_path)
 
-    print(f"Writing {feature_file_path} and {predictions_file_path}...")
+    log.info("Writing %s and %s...", feature_file_path, predictions_file_path)
     ensemble.save_results(feature_file_path, predictions_file_path, top_n, X, Y)
 
     task_end = time()

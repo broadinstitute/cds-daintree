@@ -1,4 +1,5 @@
 import gc
+import logging
 import math
 import random
 import re
@@ -18,6 +19,8 @@ from .data_models import ModelConfig
 from .exceptions import MalformedGeneLabelException
 from .parsing_utilities import split_gene_label_str
 from scipy.stats import pearsonr
+
+log = logging.getLogger(__name__)
 
 
 def filter_run_ensemble_inputs(
@@ -183,17 +186,17 @@ def single_fit(
                 model.fit(x.iloc[train], y.iloc[train])
                 ypred = model.predict(x.iloc[test])
             except MalformedGeneLabelException as e:
-                print(e)
+                log.error(str(e))
                 malformed_gene_labels.append(e.gene_label)
                 continue
             except Exception as e:
-                print("error fitting model %r for column %s" % (model, column))
-                print("train indices:\n %r\n" % train)
-                print("test indices:\n %r\n" % test)
-                print("train features: \n%r\n" % x.iloc[train])
-                print("test features: \n%r\n" % x.iloc[test])
-                print("train column: \n%r\n" % y.iloc[train])
-                print("test column: \n%r\n" % y.iloc[test])
+                log.error("error fitting model %r for column %s" % (model, column))
+                log.error("train indices:\n %r\n" % train)
+                log.error("test indices:\n %r\n" % test)
+                log.error("train features: \n%r\n" % x.iloc[train])
+                log.error("test features: \n%r\n" % x.iloc[test])
+                log.error("train column: \n%r\n" % y.iloc[train])
+                log.error("test column: \n%r\n" % y.iloc[test])
                 raise e
             model_prediction.iloc[test] = ypred[:]
             score.append(scoring(y.iloc[test], ypred))
@@ -254,7 +257,7 @@ class EnsembleRegressor:
             % X
         )
         if not len(X) == len(self.model_types):
-            print("X not the same length as models\n")
+            log.error("X not the same length as models")
             raise xerror
         for df in X[1:]:
             if not all(df.index == X[0].index):
@@ -297,7 +300,7 @@ class EnsembleRegressor:
                 outputs[key][col] = output[key]
             t = time()
             if t - curr_time > report_freq:
-                print(
+                log.info(
                     "%f elapsed, %i%% complete, %f estimated remaining"
                     % (
                         t - start_time,
@@ -385,7 +388,7 @@ class EnsembleRegressor:
                         row[f"feature{j}_correlation"] = np.nan
             rows.append(pd.DataFrame([row]))
         melted = pd.concat(rows, ignore_index=True)
-        print("Finished formatting results")
+        log.info("Finished formatting results")
         return melted
 
     def save_results(self, feat_outfile, pred_outfile, top_n, X, Y):
@@ -629,12 +632,12 @@ def run_model(
         ValueError: If `param2` is equal to `param1`.
 
     """
-    print("aligning features")
+    log.info("aligning features")
     shared_lines = list(set(X.index) & set(Y.index))
     assert len(shared_lines) > 0, "no shared lines found: \n\n features %r\n\n "
     Y = Y.loc[shared_lines]
     X = X.loc[shared_lines]
-    print("Number of shared cell lines: " + str(len(shared_lines)))
+    log.info("Number of shared cell lines: %d", len(shared_lines))
 
     if model.exempt is not None:
         constant_features = [
@@ -700,7 +703,7 @@ def run_model(
             x.index == Y.index
         ), "feature set %i index does not match Y index\n\n%r" % (i, x.iloc[:5, :5])
 
-    print("creating TDA ensemble")
+    log.info("creating TDA ensemble")
     if task == "classify":
         ensemble = EnsembleRegressor(
             model_types=models,
@@ -720,6 +723,6 @@ def run_model(
     else:
         raise ValueError('task must be "classify" or "regress"')
     ensemble.fit(X=Xtrain, Y=Y)
-    print("Finished fitting")
+    log.info("Finished fitting")
 
     return ensemble
