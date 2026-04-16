@@ -3,9 +3,12 @@ import logging
 import math
 import random
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
 from time import time
 from typing import Any, Dict, List, Optional, Tuple
+
+from tqdm import tqdm
 
 import numpy as np
 import pandas as pd
@@ -234,6 +237,7 @@ class EnsembleRegressor:
         scoring=soft_roc_auc,
         Splitter=StratifiedKFold,
         rounding=False,
+        cpus=1,
     ):
         """
         model_types: [{'Name': str, 'ModelClass': class,  'kwargs': dict}] Model classes will be initiated with the
@@ -248,6 +252,7 @@ class EnsembleRegressor:
         self.splitter = Splitter(n_splits=nfolds, shuffle=True)
         self.scoring = scoring
         self.rounding = rounding
+        self.cpus = cpus
         self.predictions = None
 
     def check_x(self, X):
@@ -263,7 +268,7 @@ class EnsembleRegressor:
             if not all(df.index == X[0].index):
                 raise xerror
 
-    def fit(self, X, Y, report_freq=20):
+    def fit(self, X, Y):
         """
         X: [{ModelClass: dataframe}
         Y: dataframe
@@ -283,32 +288,30 @@ class EnsembleRegressor:
             "features": {},
             "predictions": {},
         }
-        start_time = time()
-        curr_time = start_time
-        for i, col in enumerate(columns):
-            ind = Y.index[Y[col].notnull()]
-            output = single_fit(
-                column=col,
-                X=[x.loc[ind] for x in X],
-                Y=Y.loc[ind],
-                model_types=self.model_types,
-                splitter=self.splitter,
-                scoring=self.scoring,
-                rounding=self.rounding,
-            )
-            for key in outputs.keys():
-                outputs[key][col] = output[key]
-            t = time()
-            if t - curr_time > report_freq:
-                log.info(
-                    "%f elapsed, %i%% complete, %f estimated remaining"
-                    % (
-                        t - start_time,
-                        int(100 * (i + 1) / len(columns)),
-                        (t - start_time) * (len(columns) - i - 1) * 1.0 / (i + 1),
-                    )
+        log.info(f"Fitting models (X.shape={[x.shape for x in X]}, Y.shape={Y.shape})")
+        log.info(f"Creating thread pool with {self.cpus} worker(s)")
+        futures = {}
+        with ThreadPoolExecutor(max_workers=self.cpus) as executor:
+            for col in columns:
+                ind = Y.index[Y[col].notnull()]
+                future = executor.submit(
+                    single_fit,
+                    column=col,
+                    X=[x.loc[ind] for x in X],
+                    Y=Y.loc[ind],
+                    model_types=self.model_types,
+                    splitter=self.splitter,
+                    scoring=self.scoring,
+                    rounding=self.rounding,
                 )
-                curr_time = t
+                futures[future] = col
+            with tqdm(total=len(columns), unit="target") as progress:
+                for future in as_completed(futures):
+                    col = futures[future]
+                    output = future.result()
+                    for key in outputs.keys():
+                        outputs[key][col] = output[key]
+                    progress.update(1)
         self.trained_models.update(outputs["models"])
         self.best_indices.update(outputs["best"])
         self.scores.update(outputs["scores"])
@@ -595,6 +598,7 @@ def run_model(
     task="regress",
     relation_table=None,
     feature_metadata=None,
+    cpus=1,
 ) -> EnsembleRegressor:
     """Fit models for specified columns of Y using a selection of feature subsets from X.
 
@@ -711,6 +715,7 @@ def run_model(
             rounding=True,
             Splitter=StratifiedKFold,
             scoring=soft_roc_auc,
+            cpus=cpus,
         )
     elif task == "regress":
         ensemble = EnsembleRegressor(
@@ -719,6 +724,7 @@ def run_model(
             rounding=False,
             Splitter=QuantileKFold,
             scoring=r2_score,
+            cpus=cpus,
         )
     else:
         raise ValueError('task must be "classify" or "regress"')

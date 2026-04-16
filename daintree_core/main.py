@@ -271,6 +271,7 @@ def prepare_x_command(
     default=50,
 )
 @click.option("--seed", help="random seed (defaults to 0)", type=int, default=0)
+@click.option("--cpus", help="number of parallel workers for fitting (defaults to 1)", type=int, default=1)
 def fit_model(
     x: str,
     y: str,
@@ -288,6 +289,7 @@ def fit_model(
     output_dir: Optional[str],
     top_n: int,
     seed: int,
+    cpus: int,
 ):
     return fit_model_command(
         x,
@@ -306,6 +308,7 @@ def fit_model(
         output_dir,
         top_n,
         seed,
+        cpus,
     )
 
 
@@ -326,6 +329,7 @@ def fit_model_command(
     output_dir: Optional[str],
     top_n: int,
     seed: int,
+    cpus: int = 1,
 ):
     start_time = time()
     random.seed(seed)
@@ -412,6 +416,7 @@ def fit_model_command(
         task=task_mode,
         relation_table=related_table_df,
         feature_metadata=feature_metadata_df,
+        cpus=cpus,
     )
 
     write_start = time()
