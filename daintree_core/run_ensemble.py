@@ -599,6 +599,7 @@ def run_model(
     relation_table=None,
     feature_metadata=None,
     cpus=1,
+    select_n_features=1000,
 ) -> EnsembleRegressor:
     """Fit models for specified columns of Y using a selection of feature subsets from X.
 
@@ -663,12 +664,14 @@ def run_model(
     )
     new_model: ModelInputs = {"Name": model.name}
 
-    if (model.relation == "All") and (X.shape[1] <= 1000):
+    if (model.relation == "All") and (X.shape[1] <= select_n_features):
         new_model["ModelClass"] = PandasForest
         new_model["kwargs"] = dict(max_depth=8, n_estimators=100, min_samples_leaf=5)
-    if (model.relation == "All") and (X.shape[1] > 1000):
+    if (model.relation == "All") and (X.shape[1] > select_n_features):
         new_model["ModelClass"] = KFilteredForest
-        new_model["kwargs"] = dict(max_depth=8, n_estimators=100, min_samples_leaf=5)
+        new_model["kwargs"] = dict(
+            k=select_n_features, max_depth=8, n_estimators=100, min_samples_leaf=5
+        )
     elif model.relation == "MatchTarget":
         new_model["ModelClass"] = SelfFeatureForest
         new_model["kwargs"] = dict(

@@ -272,6 +272,12 @@ def prepare_x_command(
 )
 @click.option("--seed", help="random seed (defaults to 0)", type=int, default=0)
 @click.option("--cpus", help="number of parallel workers for fitting (defaults to 1)", type=int, default=1)
+@click.option(
+    "--select-n-features",
+    help="Number of most-correlated features to keep when fitting models with more features than this (defaults to 1000)",
+    type=int,
+    default=1000,
+)
 def fit_model(
     x: str,
     y: str,
@@ -290,6 +296,7 @@ def fit_model(
     top_n: int,
     seed: int,
     cpus: int,
+    select_n_features: int,
 ):
     return fit_model_command(
         x,
@@ -309,6 +316,7 @@ def fit_model(
         top_n,
         seed,
         cpus,
+        select_n_features,
     )
 
 
@@ -330,6 +338,7 @@ def fit_model_command(
     top_n: int,
     seed: int,
     cpus: int = 1,
+    select_n_features: int = 1000,
 ):
     start_time = time()
     random.seed(seed)
@@ -417,6 +426,7 @@ def fit_model_command(
         relation_table=related_table_df,
         feature_metadata=feature_metadata_df,
         cpus=cpus,
+        select_n_features=select_n_features,
     )
 
     write_start = time()
