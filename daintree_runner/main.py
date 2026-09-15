@@ -271,28 +271,33 @@ def create_sparkles_workflow(
         "steps": [
             {
                 "command": prepare_command,
-                "files_to_localize": ["model_config.json"],
+                "paths_to_localize": [{"src": config, "dst":"model_config.json"}],
             },
             {
                 "command": fit_model_command,
                 "parameters_csv": "{step.1.job_path}/1/out/partitions.csv",
                 "paths_to_localize": [{"src": "{step.1.job_path}/1/out", "dst": "out"}],
             },
-            {"command": ["daintree-runner", "gather", "--dir", "{step.2.job_path}"]},
+            {"command": ["daintree-runner", "gather", "--dir", "{step.2.job_path}", "{step.1.job_path}/1/out/partitions.csv"]},
         ],
         "write_on_completion": [
             {
                 "expression": {
-                    "ensemble_path": "{step.3.job_path}/1/ensemble.csv",
-                    "predictions_path": "{step.3.job_path}/1/predictions.csv",
-                },
                 "filename": "outputs.json",
+                    "sparkles_job_name": "{step.1.job_name}",
+                    "features_metadata_path": "{step.1.job_path}/1/out/feature_metadata.csv",
+                    "ensemble_path":
+                                "{step.3.job_path}/1/ensemble.csv",
+                    "predictions_path": 
+                                "{step.3.job_path}/1/predictions.csv"},
+                "filename": "daintree-output.json"
             },
         ],
     }
     workflow_json = json.dumps(workflow, indent=2)
 
     if out:
+        print(f"writing workflow to {out}")
         with open(out, "wt") as fd:
             fd.write(workflow_json)
     else:

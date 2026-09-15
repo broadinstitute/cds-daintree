@@ -4,7 +4,8 @@ FROM ubuntu:noble
 
 # Install tzdata non-interactively; else it asks for timezone
 RUN apt-get update --fix-missing && \
-  DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata software-properties-common pip rsync curl
+  DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata software-properties-common pip rsync curl \
+  build-essential pkg-config libhdf5-dev
 
 # Install Python 3.9
 RUN add-apt-repository ppa:deadsnakes/ppa && \

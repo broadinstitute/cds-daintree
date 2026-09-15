@@ -176,6 +176,7 @@ def prepare_universal_feature_set(
     """
     feature_metadatas: List[pd.DataFrame] = []
     for feature_info in feature_infos:
+        print(f"Reading {feature_info.file_name}")
         df = read_dataframe(feature_info.file_name)
 
         df, single_dataset_feature_metadata = prepare_single_dataset_features(
