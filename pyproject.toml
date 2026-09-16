@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "daintree"
-version = "0.6.0"
+version = "0.7.0"
 description = "Daintree Module"
 authors = ["Nayeem Aquib <naquib@broadinsitute.org>"]
 readme = "README.md"
