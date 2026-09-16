@@ -151,6 +151,9 @@ def single_fit(
     rounding=False,
     return_models=False,
 ):
+    ind = Y.index[Y[column].notnull()]
+    X = [x.loc[ind] for x in X]
+    Y = Y.loc[ind]
     y = Y[column]
     if rounding:
         if (y > 0.5).sum() == 0 or (y > 0.5).sum() == len(y):
@@ -293,12 +296,11 @@ class EnsembleRegressor:
         futures = {}
         with ThreadPoolExecutor(max_workers=self.cpus) as executor:
             for col in columns:
-                ind = Y.index[Y[col].notnull()]
                 future = executor.submit(
                     single_fit,
                     column=col,
-                    X=[x.loc[ind] for x in X],
-                    Y=Y.loc[ind],
+                    X=X,
+                    Y=Y,
                     model_types=self.model_types,
                     splitter=self.splitter,
                     scoring=self.scoring,
