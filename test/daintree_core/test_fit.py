@@ -5,6 +5,48 @@ from daintree_core.main import prepare_x_command, prepare_y_command, fit_model_c
 import pytest
 
 
+def test_prepare_filter(tmp_path):
+    n_samples = 100
+    n_features = 50
+
+    feature_names = [f"F{i}" for i in range(n_features)]
+    feature_names[10] = "CAT"
+    feature_names[11] = "HAT"
+    feature_names[12] = "RAT"
+    feature_names[13] = "MOOSE"
+    sample_names = [f"S{i}" for i in range(n_samples)]
+
+    # create input variables which are all random
+    features = pd.DataFrame(
+        {f: np.arange(n_samples)*fi for fi, f in enumerate(feature_names)},
+        index=sample_names,
+    )
+
+    features_path = tmp_path / "features.csv"
+    output_path = str(tmp_path / "output.csv")
+    features.to_csv(features_path)
+
+    # make sure that file get's written out with no changes
+    prepare_y_command(
+        str(features_path),
+        str(output_path),
+        top_variance_filter=None,
+        column_filter=None,
+    )
+    result = pd.read_feather(output_path)
+    assert result.shape == (len(sample_names), len(feature_names)+1)
+
+    # now filter just three columns
+    prepare_y_command(
+        str(features_path),
+        str(output_path),
+        top_variance_filter=None,
+        column_filter=[".AT", "MOOSE"],
+    )
+
+    result = pd.read_feather(output_path)
+    assert result.shape == (len(sample_names), 4+1) # CAT, RAT, HAT, MOOSE and +1 for the index
+
 @pytest.mark.parametrize("output_format", [".csv", ".ftr"])
 def test_prepare_and_fit(tmp_path, output_format):
     n_samples = 1000
@@ -76,7 +118,7 @@ model_a:
         str(targets_path),
         str(y_path) + output_format,
         top_variance_filter=None,
-        gene_filter=None,
+        column_filter=None,
     )
 
     def fit_target(start_index, end_index):

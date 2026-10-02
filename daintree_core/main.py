@@ -49,21 +49,21 @@ def main(python_path):
     type=int,
     help="If specified, will only keep the top N targets, ranked by variance",
 )
-@click.option("--gene-filter", help="If specified, will only keep the listed genes")
+@click.option("--filter", multiple=True, help="If specified, will only keep the columns who name matches this regex pattern (can be specified multiple times -- any match will keep column)")
 def prepare_y(
     input: str,
     output: str,
     top_variance_filter: Optional[int],
-    gene_filter: Optional[str],
+    filter: Optional[List[str]],
 ):
-    return prepare_y_command(input, output, top_variance_filter, gene_filter)
+    return prepare_y_command(input, output, top_variance_filter, filter)
 
 
 def prepare_y_command(
     input: str,
     output: str,
     top_variance_filter: Optional[int],
-    gene_filter: Optional[str],
+    column_filter: Optional[list[str]],
 ):
     if top_variance_filter is not None and top_variance_filter < 1:
         raise click.ClickException("Top variance filter must be >= 1")
@@ -81,13 +81,8 @@ def prepare_y_command(
         raise click.ClickException(f"Values in {input} must all be numbers")
 
     try:
-        gene_filter_list: Optional[List[str]] = None
-
-        if gene_filter is not None:
-            gene_filter_list = [gene.strip() for gene in gene_filter.split(",")]
-
         # Filter targets based on variance and/or gene
-        filtered_df = prepare_targets(df, top_variance_filter, gene_filter_list)
+        filtered_df = prepare_targets(df, top_variance_filter, column_filter)
 
         # Make output parent directories if they don't already exist
         pathlib.Path(os.path.dirname(output)).mkdir(parents=True, exist_ok=True)
